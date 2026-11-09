@@ -92,6 +92,7 @@ To run another deck: `node server.js --lesson <teacher deck url> --deck <student
 - `server.js`: HTTP server, live updates (server-sent events), teacher actions.
 - `lib/`: the game state (`game.js`), the lesson reader (`manifest.js`), quick checks (`checks.js`), AI scoring (`ai.js`).
 - `public/`: the three pages (student, teacher, projector), the room and avatar drawing, styles.
+- `public/assets/`: the office tileset and the 8 avatar sheets, from The Agency (CC0 1.0, see `public/assets/LICENSE.md`).
 - `example/lectures/`: the Week 8 deck, made game-ready.
 - `data/`: one session file per class, with names and answers. It is git-ignored; keep it off any public repository.
 

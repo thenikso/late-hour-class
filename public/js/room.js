@@ -2,38 +2,41 @@
 // The background is painted once at 16 px per tile and scaled up crisply;
 // names and labels are drawn at screen resolution so they stay sharp.
 
-import { TILE, COLS, ROWS, SCREEN, SEATS, TEACHER_SPOT, zones, LETTERS } from './world.js';
-import { avatarSprite } from './sprites.js';
+import { TILE, COLS, ROWS, SCREEN, SEATS, TEACHER_SPOT, zones, seatAt, LETTERS } from './world.js';
+import { drawAvatar, drawTile, tileset, whenReady } from './sprites.js';
 
 const W = COLS * TILE;
 const H = ROWS * TILE;
 const ZONE_COLORS = ['#4cb3ff', '#ffcf4a', '#5ee08a', '#ff8ad8', '#c39bff', '#ff9f5a'];
 
-function paintBackground() {
+// Tile ids in the office tileset (see sprites.js).
+const T = {
+  wood: [0, 1], wall: 2, wallDark: 4, window: 3, window2: 20, exitDoor: 12, chart: 11, board: 43,
+  chair: 6, pcDesk: 34, plant: 7, plants: [26, 27, 28, 29], lamp: 18, coffee: 9, cooler: 13, printer: 14,
+  sofa: [37, 38, 39], tdesk: [40, 41, 42], pingpong: [[56, 57, 58], [64, 65, 66]],
+};
+
+function paintBackground(tiles) {
   const c = document.createElement('canvas');
   c.width = W;
   c.height = H;
   const g = c.getContext('2d');
-  // floor
-  for (let y = 6; y < ROWS; y++)
-    for (let x = 0; x < COLS; x++) {
-      g.fillStyle = (x + y) % 2 ? '#2a2145' : '#2f254d';
-      g.fillRect(x * TILE, y * TILE, TILE, TILE);
-    }
-  // wall with bricks
-  g.fillStyle = '#1c1533';
-  g.fillRect(0, 0, W, 6.5 * TILE);
-  g.fillStyle = '#251c42';
-  for (let y = 0; y < 6.5 * TILE; y += 8)
-    for (let x = (y / 8) % 2 ? 0 : 8; x < W; x += 16) g.fillRect(x, y, 15, 7);
-  g.fillStyle = '#4a3a7a';
-  g.fillRect(0, 6.5 * TILE, W, 3);
-  g.fillStyle = '#120d22';
-  g.fillRect(0, 6.5 * TILE + 3, W, 2);
-  // side walls
-  g.fillStyle = '#1c1533';
-  g.fillRect(0, 6 * TILE, 8, H);
-  g.fillRect(W - 8, 6 * TILE, 8, H);
+  g.imageSmoothingEnabled = false;
+  if (!tiles) {
+    g.fillStyle = '#2a2145';
+    g.fillRect(0, 0, W, H);
+    return c;
+  }
+  const put = (id, x, y) => drawTile(g, id, x, y, TILE);
+  // floor: wooden boards, with a little variety
+  for (let y = 6; y < ROWS; y++) for (let x = 0; x < COLS; x++) put(T.wood[(x * 7 + y * 3) % 5 === 0 ? 1 : 0], x, y);
+  // the front wall
+  for (let y = 0; y < 7; y++) for (let x = 0; x < COLS; x++) put(y === 0 ? T.wallDark : T.wall, x, y);
+  g.fillStyle = 'rgba(0,0,0,0.25)';
+  g.fillRect(0, 6.5 * TILE, W, 2);
+  for (const x of [3, 4, 5, 26, 27, 28]) put(T.window, x, 2);
+  for (const x of [3, 4, 5, 26, 27, 28]) put(T.window2, x, 3);
+  put(T.exitDoor, 1, 6);
   // screen frame (the page itself is an iframe laid over this)
   const sx = SCREEN.x * TILE;
   const sy = SCREEN.y * TILE;
@@ -45,55 +48,25 @@ function paintBackground() {
   g.fillRect(sx - 2, sy - 2, sw + 4, sh + 4);
   g.fillStyle = '#ffffff';
   g.fillRect(sx, sy, sw, sh);
-  // a pin board on the left, a window on the right
-  g.fillStyle = '#0b0716';
-  g.fillRect(4 * TILE - 2, 1.4 * TILE - 2, 4.6 * TILE + 4, 3.4 * TILE + 4);
-  g.fillStyle = '#a0703f';
-  g.fillRect(4 * TILE, 1.4 * TILE, 4.6 * TILE, 3.4 * TILE);
-  const notes = ['#ffcf4a', '#5ee08a', '#4cb3ff', '#ff8ad8', '#f3e9d2'];
-  notes.forEach((c, k) => {
-    g.fillStyle = c;
-    g.fillRect((4.4 + (k % 3) * 1.4) * TILE, (1.8 + Math.floor(k / 3) * 1.5) * TILE + (k % 2) * 3, 16, 14);
-    g.fillStyle = '#c0392b';
-    g.fillRect((4.4 + (k % 3) * 1.4) * TILE + 7, (1.8 + Math.floor(k / 3) * 1.5) * TILE + (k % 2) * 3 + 1, 2, 2);
-  });
-  g.fillStyle = '#0b0716';
-  g.fillRect(23.4 * TILE - 2, 1.2 * TILE - 2, 4.6 * TILE + 4, 3.8 * TILE + 4);
-  g.fillStyle = '#2b5e8f';
-  g.fillRect(23.4 * TILE, 1.2 * TILE, 4.6 * TILE, 3.8 * TILE);
-  g.fillStyle = '#3f7fb8';
-  g.fillRect(23.4 * TILE, 1.2 * TILE, 4.6 * TILE, 1.6 * TILE);
-  g.fillStyle = '#f3e9d2';
-  g.fillRect(24.2 * TILE, 1.7 * TILE, 18, 5);
-  g.fillRect(26.3 * TILE, 2.3 * TILE, 22, 5);
-  g.fillStyle = '#1c1533';
-  g.fillRect(25.7 * TILE - 1, 1.2 * TILE, 3, 3.8 * TILE);
-  g.fillRect(23.4 * TILE, 3.1 * TILE - 1, 4.6 * TILE, 3);
-  // plants either side
-  for (const px of [2, 30]) {
-    g.fillStyle = '#6b4a2b';
-    g.fillRect(px * TILE, 5 * TILE, 12, 14);
-    g.fillStyle = '#3fae66';
-    g.fillRect(px * TILE - 2, 3.4 * TILE, 16, 22);
-    g.fillStyle = '#5ee08a';
-    g.fillRect(px * TILE + 2, 3 * TILE, 8, 10);
-  }
-  // teacher desk
-  g.fillStyle = '#5a3d24';
-  g.fillRect((TEACHER_SPOT.x - 1.5) * TILE, 7.2 * TILE, 3.5 * TILE, 10);
-  g.fillStyle = '#8a5f37';
-  g.fillRect((TEACHER_SPOT.x - 1.5) * TILE, 7.2 * TILE, 3.5 * TILE, 4);
-  // seats: desk in front, chair behind
+  // front of the room: plants, a flip chart, the teacher's desk
+  put(T.plant, 0, 6.6);
+  put(T.plant, 31, 6.6);
+  put(T.chart, 2, 7);
+  put(T.lamp, 30, 7);
+  T.tdesk.forEach((id, i) => put(id, TEACHER_SPOT.x - 1 + i, 7));
+  // seats: a desk with a computer in front, a chair behind
   for (const s of SEATS) {
-    const x = s.x * TILE;
-    const y = s.y * TILE;
-    g.fillStyle = '#5a3d24';
-    g.fillRect(x - 1, y + 1, TILE + 2, 6);
-    g.fillStyle = '#8a5f37';
-    g.fillRect(x - 1, y + 1, TILE + 2, 2);
-    g.fillStyle = '#7a3b52';
-    g.fillRect(x + 3, y + 10, TILE - 6, 6);
+    put(T.pcDesk, s.x, s.y - 1);
+    put(T.chair, s.x, s.y);
   }
+  // back of the room: a break corner
+  put(T.coffee, 1, 16.6);
+  put(T.cooler, 2, 16.6);
+  put(T.printer, 3, 16.6);
+  T.sofa.forEach((id, i) => put(id, 6 + i, 16.8));
+  T.pingpong.forEach((row, j) => row.forEach((id, i) => put(id, 14.5 + i, 15.8 + j)));
+  T.sofa.forEach((id, i) => put(id, 23 + i, 16.8));
+  T.plants.forEach((id, i) => put(id, 27 + i, 16.6));
   return c;
 }
 
@@ -101,7 +74,8 @@ export class Room {
   constructor(canvas) {
     this.canvas = canvas;
     this.g = canvas.getContext('2d');
-    this.bg = paintBackground();
+    this.bg = paintBackground(null);
+    whenReady(tileset, () => (this.bg = paintBackground(tileset)));
     this.players = new Map(); // id -> { meta, x, y, rx, ry, dir, moving, online }
     this.state = null;
     this.selfId = null;
@@ -183,19 +157,26 @@ export class Room {
     }
     list.sort((a, b) => a.ry - b.ry);
     for (const p of list) {
-      const frame = p.moving ? Math.floor(t / 160) % 2 : 0;
-      const sprite = avatarSprite(p.meta.avatar, p.dir || 'down', frame);
       const fx = (p.rx + 0.5) * TILE;
       const fy = (p.ry + 0.85) * TILE;
-      g.fillStyle = 'rgba(0,0,0,0.35)';
-      g.fillRect(fx - 5, fy - 1, 10, 2);
-      g.drawImage(sprite, Math.round(fx - 6), Math.round(fy - 16));
+      const seat = p.moving ? -1 : seatAt(p.rx, p.ry);
+      p.sitting = seat >= 0 && Math.abs(p.rx - SEATS[seat].x) < 0.15 && Math.abs(p.ry - SEATS[seat].y) < 0.15;
+      if (p.sitting) {
+        drawAvatar(g, p.meta.avatar, 'sit', 'up', 0, fx, fy + 4);
+      } else {
+        g.fillStyle = 'rgba(0,0,0,0.3)';
+        g.fillRect(fx - 5, fy - 1, 10, 2);
+        const phase = (p.meta.avatar * 97) % 400; // idle breathing out of step
+        const frame = p.moving ? Math.floor(t / 130) % 4 : Math.floor((t + phase) / 280) % 4;
+        drawAvatar(g, p.meta.avatar, p.moving ? 'walk' : 'idle', p.dir || 'down', frame, fx, fy);
+      }
       if (p.meta.id === this.selfId) {
         const bob = Math.sin(t / 200) * 1.5;
+        const top = fy - (p.sitting ? 20 : 28);
         g.fillStyle = '#ffcf4a';
-        g.fillRect(fx - 2, fy - 22 + bob, 5, 2);
-        g.fillRect(fx - 1, fy - 20 + bob, 3, 2);
-        g.fillRect(fx, fy - 18 + bob, 1, 1);
+        g.fillRect(fx - 2, top + bob, 5, 2);
+        g.fillRect(fx - 1, top + 2 + bob, 3, 2);
+        g.fillRect(fx, top + 4 + bob, 1, 1);
       }
     }
 
@@ -209,7 +190,7 @@ export class Room {
       g.textBaseline = 'bottom';
       for (const p of list) {
         const x = (p.rx + 0.5) * TILE * this.scale;
-        const y = ((p.ry + 0.85) * TILE - 17) * this.scale;
+        const y = ((p.ry + 0.85) * TILE - (p.sitting ? 17 : 25)) * this.scale;
         const name = p.meta.name;
         const w = g.measureText(name).width + 8;
         g.fillStyle = 'rgba(11,7,22,0.7)';
@@ -229,7 +210,7 @@ export class Room {
       const opt = q.order[i];
       const col = ZONE_COLORS[i % ZONE_COLORS.length];
       const good = correct.includes(opt);
-      g.globalAlpha = revealed ? (good ? 0.35 + 0.1 * Math.sin(t / 150) : 0.08) : 0.16;
+      g.globalAlpha = revealed ? (good ? 0.4 + 0.1 * Math.sin(t / 150) : 0.1) : 0.26;
       g.fillStyle = revealed && good ? '#5ee08a' : col;
       g.fillRect(z.x * TILE + 2, z.y * TILE, z.w * TILE - 4, z.h * TILE);
       g.globalAlpha = 1;
@@ -245,6 +226,13 @@ export class Room {
     const g = this.g;
     const zs = zones(q.order.length);
     const s = this.scale;
+    g.lineJoin = 'round';
+    g.strokeStyle = 'rgba(11,7,22,0.9)';
+    const text = (str, x, y) => {
+      g.lineWidth = Math.max(3, s * 1.6);
+      g.strokeText(str, x, y);
+      g.fillText(str, x, y);
+    };
     zs.forEach((z, i) => {
       const opt = q.order[i];
       const x = (z.x + z.w / 2) * TILE * s;
@@ -254,7 +242,7 @@ export class Room {
       g.textBaseline = 'top';
       g.font = `bold ${big}px Monocraft, ui-monospace, monospace`;
       g.fillStyle = ZONE_COLORS[i % ZONE_COLORS.length];
-      g.fillText(LETTERS[i], x, y);
+      text(LETTERS[i], x, y);
       const small = Math.max(9, Math.round(3.6 * s));
       g.font = `${small}px Monocraft, ui-monospace, monospace`;
       g.fillStyle = '#f6f0ff';
@@ -266,7 +254,7 @@ export class Room {
       for (const w of words) {
         const test = line ? `${line} ${w}` : w;
         if (g.measureText(test).width > maxW && line) {
-          g.fillText(line, x, ly);
+          text(line, x, ly);
           ly += small + 3;
           line = w;
           if (++lines >= 4) {
@@ -275,12 +263,12 @@ export class Room {
           }
         } else line = test;
       }
-      if (line) g.fillText(line, x, ly);
+      if (line) text(line, x, ly);
       if (q.counts && q.status === 'revealed') {
         g.font = `bold ${Math.max(12, Math.round(6 * s))}px Monocraft, ui-monospace, monospace`;
         g.fillStyle = '#ffcf4a';
         g.textBaseline = 'bottom';
-        g.fillText(`${q.counts[opt]}`, x, (z.y + z.h - 0.2) * TILE * s);
+        text(`${q.counts[opt]}`, x, (z.y + z.h - 0.2) * TILE * s);
       }
     });
   }

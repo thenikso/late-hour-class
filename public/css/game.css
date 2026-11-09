@@ -241,4 +241,4 @@ textarea:focus, input:focus { outline: none; border-color: var(--gold); }
   cursor: pointer;
 }
 .avatars button[aria-pressed='true'] { border-color: var(--gold); background: #3b2e6b; }
-.avatars canvas { width: 48px; height: 64px; image-rendering: pixelated; }
+.avatars canvas { width: 48px; height: 72px; image-rendering: pixelated; }

@@ -69,5 +69,5 @@ body { overflow: auto; font-size: 14px; }
 .players li { display: flex; gap: 6px; align-items: center; padding: 2px 0; }
 .players li.off { opacity: 0.45; }
 .players li .grow { flex: 1; }
-.players canvas { width: 12px; height: 16px; image-rendering: pixelated; }
+.players canvas { width: 12px; height: 18px; image-rendering: pixelated; }
 details summary { cursor: pointer; color: var(--quiet); }
