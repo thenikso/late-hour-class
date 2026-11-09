@@ -1,0 +1,16 @@
+{
+  "name": "class-game-engine",
+  "version": "0.1.0",
+  "private": true,
+  "description": "A pixel-art classroom game: students join over the LAN, the teacher drives slides, questions and scoring. Node only, no dependencies.",
+  "type": "module",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "start": "node server.js",
+    "example": "node tools/run-example.js",
+    "example:mock": "node tools/run-example.js --ai mock",
+    "slides": "node tools/serve-slides.js",
+    "font": "node tools/fetch-font.js",
+    "test": "node --test test/*.test.js"
+  }
+}

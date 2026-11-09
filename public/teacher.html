@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Class game · teacher</title>
+    <link rel="icon" href="data:," />
+    <link rel="stylesheet" href="css/game.css" />
+    <link rel="stylesheet" href="css/teacher.css" />
+  </head>
+  <body>
+    <header class="top">
+      <strong id="lesson">…</strong>
+      <span class="quiet">Students join at</span>
+      <code id="join-url" class="join-url">…</code>
+      <span class="grow"></span>
+      <a class="btn small" id="open-screen" target="_blank" rel="noopener">Open projector view ↗</a>
+      <span class="pill quiet" id="conn">connecting…</span>
+    </header>
+
+    <main class="cols">
+      <section class="col slides panel">
+        <div class="row">
+          <button class="btn" id="prev" title="Previous slide (←)">◀</button>
+          <button class="btn" id="next" title="Next slide (→)">▶</button>
+          <button class="btn" id="cue" title="Reveal the next step on the slide (E)">E</button>
+          <span class="grow"></span>
+          <label class="goto">Go to <input type="number" id="goto" min="1" /></label>
+        </div>
+        <ol class="slide-list" id="slide-list"></ol>
+        <details id="notes-box">
+          <summary>Speaker notes for this slide</summary>
+          <iframe id="notes" title="Speaker notes"></iframe>
+        </details>
+      </section>
+
+      <section class="col centre">
+        <div class="panel">
+          <div class="row">
+            <strong>Room</strong>
+            <button class="btn" data-mode="free">Free roam</button>
+            <button class="btn" id="seat">Take your seat · <input type="number" id="seat-s" value="20" min="5" max="120" /> s</button>
+            <button class="btn" data-mode="present">Presentation</button>
+          </div>
+          <div class="row">
+            <input type="text" id="url" placeholder="Share any URL on the screen…" />
+            <button class="btn" id="share">Share</button>
+          </div>
+        </div>
+        <div class="panel" id="question"></div>
+      </section>
+
+      <section class="col side">
+        <div class="panel"><canvas id="mini"></canvas></div>
+        <div class="panel">
+          <strong>Players <span class="quiet" id="count"></span></strong>
+          <ul class="players" id="players"></ul>
+        </div>
+        <div class="panel" id="board"></div>
+      </section>
+    </main>
+    <script type="module" src="js/teacher.js"></script>
+  </body>
+</html>

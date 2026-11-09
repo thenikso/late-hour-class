@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Class game</title>
+    <link rel="icon" href="data:," />
+    <link rel="stylesheet" href="css/game.css" />
+    <link rel="stylesheet" href="css/student.css" />
+  </head>
+  <body>
+    <div class="stage" id="stage">
+      <div class="room-wrap" id="room-wrap">
+        <canvas id="room"></canvas>
+        <iframe class="screen-frame" id="screen" title="The shared screen" hidden></iframe>
+      </div>
+    </div>
+
+    <div class="hud">
+      <div class="pill" id="me"></div>
+      <div class="pill"><span class="mode-label" id="mode">…</span></div>
+      <div class="grow"></div>
+      <a class="pill" id="open-screen" target="_blank" rel="noopener" hidden>Open the screen in a tab ↗</a>
+      <span class="pill quiet" id="conn">connecting…</span>
+    </div>
+    <div class="banner panel" id="banner" hidden></div>
+
+    <section class="sheet panel" id="sheet" hidden></section>
+
+    <div class="modal" id="join" hidden>
+      <form class="panel join" id="join-form">
+        <h1>Join the class</h1>
+        <label>Your name<br /><input type="text" id="name" maxlength="24" autocomplete="off" required /></label>
+        <p>Pick your avatar</p>
+        <div class="avatars" id="avatars"></div>
+        <p class="err" id="join-err"></p>
+        <button class="btn go" type="submit">Enter the room →</button>
+        <p class="quiet small">Points here are just for fun: they never count toward your grade.</p>
+      </form>
+    </div>
+
+    <div class="modal" id="result" hidden>
+      <div class="panel result">
+        <h2 id="result-title">Your score</h2>
+        <div id="result-show"></div>
+        <div id="result-feedback"></div>
+        <div class="row">
+          <button class="btn go" id="retry" hidden>Try again ↻</button>
+          <button class="btn" id="result-close">Back to the room</button>
+        </div>
+      </div>
+    </div>
+
+    <script type="module" src="js/student.js"></script>
+  </body>
+</html>

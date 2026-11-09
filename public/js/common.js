@@ -1,0 +1,211 @@
+// Shared browser helpers: server connection, the screen iframe, score effects.
+
+export const $ = (sel, root = document) => root.querySelector(sel);
+export const h = (tag, attrs = {}, ...kids) => {
+  const el = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs || {})) {
+    if (v === undefined || v === null || v === false) continue;
+    if (k === 'class') el.className = v;
+    else if (k.startsWith('on')) el.addEventListener(k.slice(2), v);
+    else if (k === 'html') el.innerHTML = v;
+    else el.setAttribute(k, v === true ? '' : v);
+  }
+  for (const kid of kids.flat()) if (kid !== null && kid !== undefined && kid !== false) el.append(kid.nodeType ? kid : String(kid));
+  return el;
+};
+
+export const store = {
+  get(k) {
+    try {
+      return localStorage.getItem(k);
+    } catch {
+      return null;
+    }
+  },
+  set(k, v) {
+    try {
+      localStorage.setItem(k, v);
+    } catch {}
+  },
+  del(k) {
+    try {
+      localStorage.removeItem(k);
+    } catch {}
+  },
+};
+
+export async function post(path, body = {}) {
+  const res = await fetch(path, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw Object.assign(new Error(data.error || `HTTP ${res.status}`), { status: res.status });
+  return data;
+}
+
+/** Live connection: full state on every change, positions ten times a second. */
+export function connect(query, { onState, onPos, onGone, onStatus }) {
+  let es;
+  let dead = false;
+  const open = () => {
+    es = new EventSource(`/events?${new URLSearchParams(query)}`);
+    es.addEventListener('state', (e) => onState(JSON.parse(e.data)));
+    es.addEventListener('pos', (e) => onPos && onPos(JSON.parse(e.data)));
+    es.addEventListener('kicked', () => {
+      dead = true;
+      es.close();
+      onGone && onGone('kicked');
+    });
+    es.onopen = () => onStatus && onStatus(true);
+    es.onerror = async () => {
+      onStatus && onStatus(false);
+      if (dead) return;
+      // A 401/403 means our token or key is no longer valid: stop retrying.
+      if (es.readyState === EventSource.CLOSED) {
+        const ctl = new AbortController();
+        const r = await fetch(`/events?${new URLSearchParams(query)}`, { signal: ctl.signal }).catch(() => null);
+        ctl.abort();
+        if (r && (r.status === 401 || r.status === 403)) {
+          dead = true;
+          onGone && onGone('auth');
+        } else setTimeout(open, 1500);
+      }
+    };
+  };
+  open();
+  return { close: () => ((dead = true), es.close()) };
+}
+
+/** Keeps an iframe on the shared page; reveals steps in game-ready decks. */
+/**
+ * Put the shared page in a box. The page always renders at 1280×720 and is scaled
+ * (letterboxed) into the box, so the deck never reflows when the box grows or shrinks:
+ * slides keep their projector layout and the scroll position stays on the right slide.
+ */
+export const FRAME_W = 1280;
+export const FRAME_H = 720;
+export function placeFrame(iframe, r) {
+  const s = Math.min(r.width / FRAME_W, r.height / FRAME_H);
+  Object.assign(iframe.style, {
+    width: `${FRAME_W}px`,
+    height: `${FRAME_H}px`,
+    left: `${r.left + (r.width - FRAME_W * s) / 2}px`,
+    top: `${r.top + (r.height - FRAME_H * s) / 2}px`,
+    transform: `scale(${s})`,
+  });
+}
+
+export function screenFrame(iframe) {
+  let current = null;
+  let cueSeen = 0;
+  return {
+    update(state, deckUrl) {
+      const s = state.screen || {};
+      const url = s.slide && deckUrl ? `${deckUrl}#${s.slide}` : s.url;
+      if (!url) {
+        iframe.hidden = true;
+        current = null;
+        return;
+      }
+      iframe.hidden = false;
+      if (url !== current) {
+        current = url;
+        iframe.src = url;
+        cueSeen = s.cue || 0;
+        return;
+      }
+      while ((s.cue || 0) > cueSeen) {
+        cueSeen++;
+        try {
+          iframe.contentWindow.postMessage({ type: 'cge:cue' }, '*');
+        } catch {}
+      }
+    },
+    url: () => current,
+  };
+}
+
+// ---- sound: tiny blips, off until someone turns them on ----------------------
+let audio = null;
+export const sound = {
+  on: false,
+  enable() {
+    audio = audio || new (window.AudioContext || window.webkitAudioContext)();
+    audio.resume();
+    this.on = true;
+  },
+  blip(step = 0, kind = 'square') {
+    if (!this.on || !audio) return;
+    const o = audio.createOscillator();
+    const gain = audio.createGain();
+    o.type = kind;
+    o.frequency.value = 330 * Math.pow(2, step / 12);
+    gain.gain.setValueAtTime(0.07, audio.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, audio.currentTime + 0.12);
+    o.connect(gain).connect(audio.destination);
+    o.start();
+    o.stop(audio.currentTime + 0.13);
+  },
+};
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const reduced = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+export function bump(el, cls = 'pop') {
+  el.classList.remove(cls);
+  void el.offsetWidth;
+  el.classList.add(cls);
+}
+
+export async function countTo(el, from, to, ms = 500) {
+  if (reduced() || from === to) {
+    el.textContent = fmt(to);
+    return;
+  }
+  const t0 = performance.now();
+  return new Promise((done) => {
+    const step = (t) => {
+      const k = Math.min(1, (t - t0) / ms);
+      const v = from + (to - from) * (1 - Math.pow(1 - k, 3));
+      el.textContent = Number.isInteger(to) && Number.isInteger(from) ? String(Math.round(v)) : fmt(v);
+      if (k < 1) requestAnimationFrame(step);
+      else done();
+    };
+    requestAnimationFrame(step);
+  });
+}
+const fmt = (n) => (Number.isInteger(n) ? String(n) : Math.abs(n % 1) < 0.05 ? String(Math.round(n)) : n.toFixed(1));
+
+/**
+ * The scoring show: each step lands one by one, chips and mult tick up,
+ * then the total slams in. `root` gets the markup.
+ */
+export async function scoreShow(root, breakdown, { fast = false } = {}) {
+  root.innerHTML = '';
+  const steps = h('ul', { class: 'score-steps' });
+  const chips = h('div', { class: 'score-box chips' }, '0');
+  const mult = h('div', { class: 'score-box mult' }, '1');
+  const total = h('div', { class: 'score-total' }, '0');
+  root.append(steps, h('div', { class: 'score-show' }, chips, h('div', { class: 'score-x' }, '×'), mult), total);
+  let c = 0;
+  let m = 1;
+  let i = 0;
+  const gap = fast || reduced() ? 0 : 380;
+  for (const s of breakdown.steps) {
+    await sleep(gap);
+    steps.append(h('li', {}, h('span', {}, s.label), s.chips ? h('span', { class: 'c' }, `+${s.chips}`) : h('span', { class: 'm' }, `+${s.mult} mult`)));
+    if (s.chips) {
+      await countTo(chips, c, c + s.chips, gap ? 260 : 0);
+      c += s.chips;
+      bump(chips);
+    }
+    if (s.mult) {
+      await countTo(mult, m, m + s.mult, gap ? 260 : 0);
+      m += s.mult;
+      bump(mult);
+    }
+    sound.blip(i++ * 2);
+  }
+  await sleep(gap);
+  await countTo(total, 0, breakdown.total, gap ? 700 : 0);
+  bump(total, breakdown.total >= 100 ? 'shake' : 'pop');
+  sound.blip(14, 'triangle');
+}

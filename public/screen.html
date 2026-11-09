@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Class game · projector</title>
+    <link rel="icon" href="data:," />
+    <link rel="stylesheet" href="css/game.css" />
+    <style>
+      .room-wrap { position: absolute; }
+      .stage { place-items: start center; }
+      .join { position: fixed; left: 12px; bottom: 12px; z-index: 20; font-size: 18px; }
+      .join b { color: var(--gold); }
+      .qbar { position: fixed; left: 12px; right: 300px; bottom: 12px; max-width: 1100px; z-index: 22; display: flex; gap: 18px; align-items: center; }
+      .qbar .text { flex: 1; }
+      .qbar h2 { margin: 0; color: var(--gold); font-size: 22px; }
+      .qbar p { margin: 2px 0 0; font-size: 17px; }
+      .qbar .count { font-size: 46px; color: var(--gold); text-align: center; line-height: 1; }
+      .qbar .count small { display: block; font-size: 13px; color: var(--quiet); }
+      .all-in { color: var(--good) !important; }
+      .wall { position: fixed; right: 12px; top: 12px; bottom: 12px; width: min(560px, 38vw); z-index: 24; overflow: auto; }
+      .wall h2 { margin: 0 0 6px; color: var(--gold); }
+      .wall .card { background: var(--bg2); border-radius: 6px; padding: 8px 10px; margin: 6px 0; border: 2px solid #45367a; }
+      .wall .card .who { display: flex; gap: 8px; align-items: center; font-weight: bold; }
+      .wall .card .who .grow { flex: 1; }
+      .wall .card .who .points { font-size: 20px; }
+      .stat { margin: 6px 0; }
+      .stat .bar { display: inline-block; height: 14px; background: var(--chips); vertical-align: middle; margin: 0 6px; border: 1px solid var(--line); }
+      .stat.right .bar { background: var(--good); }
+      .spot { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(900px, 80vw); z-index: 40; font-size: 24px; }
+      .spot h2 { margin: 0 0 8px; color: var(--gold); }
+      .spot .q { font-size: 15px; color: var(--quiet); }
+      .board { position: fixed; left: 12px; top: 12px; z-index: 23; min-width: 240px; }
+      .board h3 { margin: 0 0 4px; color: var(--gold); font-size: 15px; }
+      .board ol, .board ul { margin: 0 0 6px; padding-left: 22px; }
+      .tools { position: fixed; right: 12px; bottom: 12px; z-index: 30; display: flex; gap: 6px; }
+      body.full .screen-frame { z-index: 35; }
+    </style>
+  </head>
+  <body>
+    <div class="stage">
+      <div class="room-wrap" id="room-wrap">
+        <canvas id="room"></canvas>
+        <iframe class="screen-frame" id="screen" title="The shared screen" hidden></iframe>
+      </div>
+    </div>
+    <div class="join pill" id="join">Join: <b id="join-url">…</b></div>
+    <div class="banner panel" id="banner" hidden></div>
+    <div class="qbar panel" id="qbar" hidden></div>
+    <div class="wall panel" id="wall" hidden></div>
+    <div class="board panel" id="board" hidden></div>
+    <div class="spot panel" id="spot" hidden></div>
+    <div class="tools">
+      <button class="btn small" id="sound">Sound off</button>
+      <button class="btn small" id="full" title="F: the shared page fills the projector">Full screen page (F)</button>
+    </div>
+    <script type="module" src="js/screen.js"></script>
+  </body>
+</html>
