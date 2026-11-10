@@ -1,5 +1,7 @@
 # Class game engine (proof of concept)
 
+The design and its reasons are in [docs/design.md](docs/design.md); notes for working on the code (with Claude or otherwise) are in [CLAUDE.md](CLAUDE.md).
+
 A pixel-art classroom that runs from the teacher's laptop. Students join from their own browser over the classroom Wi-Fi, pick an avatar and walk around a shared room. The teacher drives the slides on the room's screen, seats everyone for explanations, opens questions, and reveals scores with a bit of show.
 
 One Node process, no dependencies, no build step. Node 20 or later.
