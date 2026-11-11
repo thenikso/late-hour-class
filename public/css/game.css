@@ -242,3 +242,29 @@ textarea:focus, input:focus { outline: none; border-color: var(--gold); }
 }
 .avatars button[aria-pressed='true'] { border-color: var(--gold); background: #3b2e6b; }
 .avatars canvas { width: 48px; height: 72px; image-rendering: pixelated; }
+
+/* ---- the fun layer ---------------------------------------------------------- */
+.icon { image-rendering: pixelated; display: block; }
+canvas.avatar { image-rendering: pixelated; }
+.confetti { position: fixed; inset: 0; width: 100%; height: 100%; image-rendering: pixelated; pointer-events: none; z-index: 90; }
+.toasts { position: fixed; top: 60px; left: 50%; transform: translateX(-50%); z-index: 80; display: grid; gap: 8px; justify-items: center; pointer-events: none; }
+.toast { display: flex; gap: 10px; align-items: center; border-color: var(--gold); animation: toast-in 0.25s ease-out; transition: opacity 0.35s, transform 0.35s; }
+.toast.out { opacity: 0; transform: translateY(-8px); }
+@keyframes toast-in { from { transform: translateY(-14px); opacity: 0; } }
+
+.classbar { gap: 8px; }
+.classbar .lvl { color: var(--gold); font-weight: bold; white-space: nowrap; }
+.classbar .meter { width: 90px; height: 10px; background: #120d22; border: 2px solid var(--line); display: inline-block; }
+.classbar .fill { display: block; height: 100%; background: var(--good); transition: width 0.8s ease-out; }
+.classbar .next { font-size: 12px; white-space: nowrap; }
+
+.emotes { gap: 2px; padding: 2px 4px; }
+.emotes button { background: none; border: 2px solid transparent; border-radius: 4px; padding: 2px; cursor: pointer; }
+.emotes button:hover { border-color: var(--gold); background: var(--panel2); }
+.emotes button:active { transform: translateY(1px); }
+.emotes button[aria-pressed='true'] { border-color: var(--warn); background: #4a3413; }
+.timer { color: var(--gold); font-weight: bold; }
+.timer.low { color: var(--bad); }
+.streak { color: var(--warn); white-space: nowrap; }
+@media (prefers-reduced-motion: reduce) { .toast { animation: none; } }
+.ok { color: var(--good); }

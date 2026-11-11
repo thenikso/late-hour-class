@@ -13,6 +13,7 @@
       <strong id="lesson">…</strong>
       <span class="quiet">Students join at</span>
       <code id="join-url" class="join-url">…</code>
+      <span class="lost" id="lost" hidden></span>
       <span class="grow"></span>
       <a class="btn small" id="open-screen" target="_blank" rel="noopener">Open projector view ↗</a>
       <span class="pill quiet" id="conn">connecting…</span>
@@ -41,6 +42,8 @@
             <button class="btn" data-mode="free">Free roam</button>
             <button class="btn" id="seat">Take your seat · <input type="number" id="seat-s" value="20" min="5" max="120" /> s</button>
             <button class="btn" data-mode="present">Presentation</button>
+            <span class="grow"></span>
+            <button class="btn gold" id="finale" title="The closing ceremony on the projector: podium, improvers, streaks">Finale</button>
           </div>
           <div class="row">
             <input type="text" id="url" placeholder="Share any URL on the screen…" />
@@ -57,6 +60,11 @@
           <ul class="players" id="players"></ul>
         </div>
         <div class="panel" id="board"></div>
+        <div class="panel">
+          <strong>Class goal</strong>
+          <div class="classbar" id="klass"></div>
+          <p class="quiet small" id="klass-note"></p>
+        </div>
       </section>
     </main>
     <script type="module" src="js/teacher.js"></script>

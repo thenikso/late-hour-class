@@ -1,6 +1,7 @@
-import { $, h, store, post, connect, screenFrame, placeFrame, scoreShow, countTo, bump } from './common.js';
+import { $, h, store, post, connect, screenFrame, placeFrame, scoreShow, countTo, bump, sound, toast, celebrate, clock, classBar } from './common.js';
 import { Room, ROOM_SIZE } from './room.js';
-import { AVATARS, avatarCanvas } from './sprites.js';
+import { AVATARS, avatarCanvas, iconCanvas } from './sprites.js';
+import { EMOTES, HATS, hatUnlocked, hatHint } from './fun.js';
 import { clampToFloor, zoneAt, LETTERS, CIRCLED } from './world.js';
 import { marksToHtml } from './marks.js';
 
@@ -78,6 +79,18 @@ function start() {
         render();
       },
       onPos: (list) => room.setPositions(list),
+      onBall: ([x, y]) => room.setBall(x, y),
+      onFx: (ev) => {
+        room.fx(ev);
+        const mine = ev.id === state?.me.id;
+        if (ev.t === 'handin' && mine) sound.tune('handin');
+        if (ev.t === 'emote' && mine) sound.tune('emote');
+        if (ev.t === 'level') {
+          toast(`Class level ${ev.level}! ${ev.text}.`, { ms: 7000 });
+          celebrate();
+          sound.tune('level');
+        }
+      },
       onGone: (why) => {
         store.del('cge-token');
         token = null;
@@ -85,6 +98,7 @@ function start() {
       },
       onStatus: (ok) => {
         $('#conn').textContent = ok ? 'online' : 'reconnecting…';
+        $('#conn').hidden = ok; // only shown when something is wrong
         $('#conn').style.color = ok ? 'var(--good)' : 'var(--warn)';
       },
     },
@@ -106,7 +120,74 @@ addEventListener('keydown', (e) => {
     const lock = $('#lock-in');
     if (lock && !lock.disabled) lock.click();
   }
+  if (e.repeat || e.metaKey || e.ctrlKey || e.altKey || !state) return;
+  if (k >= '1' && k <= String(EMOTES.length)) sendEmote(EMOTES[Number(k) - 1].id);
+  if (k === ' ' && document.activeElement?.tagName !== 'BUTTON') {
+    e.preventDefault();
+    sendEmote('hop');
+  }
 });
+
+// ---- reactions, hats, sound ---------------------------------------------------------
+function sendEmote(e) {
+  post('/api/emote', { token, e }).catch(() => {});
+}
+EMOTES.forEach((em, i) => {
+  const b = h('button', { type: 'button', title: `${em.label} (key ${i + 1})`, 'aria-label': em.label, 'data-e': em.id }, iconCanvas('emote', em.id, 2));
+  b.onclick = () => (sendEmote(em.id), b.blur());
+  $('#emotes').append(b);
+});
+
+$('#sound').onclick = () => {
+  if (sound.on) sound.on = false;
+  else sound.enable();
+  $('#sound').textContent = sound.on ? 'Sound on' : 'Sound off';
+  $('#sound').blur();
+};
+$('#hats-open').onclick = () => (($('#hats').hidden = false), renderHats(), $('#hats-open').blur());
+$('#hats-close').onclick = () => ($('#hats').hidden = true);
+
+function renderHats() {
+  const grid = $('#hat-grid');
+  if ($('#hats').hidden || !state) return;
+  const me = state.me;
+  const sig = `${me.hat}|${me.points}|${me.improved}`;
+  if (grid.dataset.sig === sig) return;
+  grid.dataset.sig = sig;
+  grid.innerHTML = '';
+  const wear = (id) => post('/api/hat', { token, hat: id }).catch((e) => toast(e.message));
+  grid.append(h('button', { type: 'button', 'aria-pressed': String(!me.hat), onclick: () => wear('') }, avatarCanvas(me.avatar, 3, 'none'), 'No hat'));
+  for (const hat of HATS) {
+    const open = hatUnlocked(hat, me);
+    grid.append(
+      h(
+        'button',
+        { type: 'button', disabled: !open, 'aria-pressed': String(me.hat === hat.id), onclick: () => wear(hat.id) },
+        avatarCanvas(me.avatar, 3, hat.id),
+        hat.name,
+        open ? null : h('span', { class: 'hint' }, hatHint(hat)),
+      ),
+    );
+  }
+}
+
+// New hats: say so once, when the points that unlock them arrive.
+let knownHats = null;
+function checkHats() {
+  const open = HATS.filter((x) => hatUnlocked(x, state.me)).map((x) => x.id);
+  if (knownHats) {
+    const fresh = HATS.filter((x) => open.includes(x.id) && !knownHats.includes(x.id));
+    for (const hat of fresh) toast(`New hat: ${hat.name}! Open Hats to wear it.`, { icon: iconCanvas('hat', hat.id, 2) });
+    if (fresh.length) {
+      sound.tune('hat');
+      bump($('#hats-open'));
+    }
+  }
+  knownHats = open;
+}
+
+// The soft timer ticks between server updates.
+setInterval(() => state && updateLiveBits(), 500);
 addEventListener('keyup', (e) => keys.delete(e.key.toLowerCase()));
 addEventListener('blur', () => keys.clear());
 
@@ -152,7 +233,7 @@ function layout() {
   const docked = innerWidth >= 1000 && !sheet.hidden; // the sheet sits on the right (see student.css)
   const sheetH = sheet.hidden || docked ? 0 : sheet.offsetHeight + 16;
   const sheetW = docked ? sheet.offsetWidth + 20 : 0;
-  const top = 56;
+  const top = Math.max(56, $('.hud').offsetHeight + 20); // the top bar wraps onto two rows on narrow screens
   const availW = innerWidth - 20 - sheetW;
   const availH = Math.max(160, innerHeight - top - sheetH - 8);
   room.fit(availW, availH);
@@ -174,11 +255,27 @@ let shownPoints = 0;
 function render() {
   const s = state;
   const meBox = $('#me');
-  if (!meBox.dataset.ready) {
+  if (meBox.dataset.ready !== `hat:${s.me.hat}`) {
     meBox.innerHTML = '';
-    meBox.append(avatarCanvas(s.me.avatar, 1.5), h('span', {}, s.me.name), h('span', { class: 'points', id: 'my-points' }, '0'), h('span', { class: 'quiet' }, 'pts'));
-    meBox.dataset.ready = '1';
+    meBox.append(
+      avatarCanvas(s.me.avatar, 1.5, s.me.hat),
+      h('span', {}, s.me.name),
+      h('span', { class: 'points', id: 'my-points' }, String(shownPoints)),
+      h('span', { class: 'quiet' }, 'pts'),
+      h('span', { class: 'streak', id: 'my-streak', title: 'Questions handed in, in a row. Keep it going for bonus points.' }),
+    );
+    meBox.dataset.ready = `hat:${s.me.hat}`;
   }
+  const streak = $('#my-streak');
+  const streakText = s.me.streak >= 2 ? `${s.me.streak} in a row` : '';
+  if (streak.textContent !== streakText) {
+    streak.textContent = streakText;
+    if (streakText) bump(streak);
+  }
+  classBar($('#klass'), s.klass);
+  document.querySelector('#emotes [data-e="lost"]').setAttribute('aria-pressed', String(!!s.me.lost));
+  checkHats();
+  renderHats();
   if (s.me.points !== shownPoints) {
     const el = $('#my-points');
     countTo(el, shownPoints, s.me.points, 700).then(() => bump(el));
@@ -298,7 +395,13 @@ function renderSheet() {
 function updateLiveBits() {
   const q = state.question;
   const el = $('#live-count');
-  if (q && el) el.textContent = q.status === 'open' ? `${q.submitted}/${q.online} handed in` : q.status === 'revealed' ? 'Results are out' : 'Waiting for the scores…';
+  if (!q || !el) return;
+  const left = q.timerEndsAt ? q.timerEndsAt - (Date.now() + room.skew) : null;
+  const time = left === null ? '' : left > 0 ? ` · ${clock(left)}` : ' · time is up, wrap it up';
+  const txt = q.status === 'open' ? `${q.submitted}/${q.online} handed in${time}` : q.status === 'revealed' ? 'Results are out' : 'Waiting for the scores…';
+  if (el.textContent !== txt) el.textContent = txt;
+  el.classList.toggle('timer', left !== null && q.status === 'open');
+  el.classList.toggle('low', left !== null && left < 15000);
 }
 
 function answerSummary(q, mine) {
@@ -457,6 +560,9 @@ function openResult(fast) {
     if (mine.feedback) fb.append(h('div', { class: 'feedback' }, mine.feedback));
     if (mine.missed) fb.append(h('p', { class: 'missed' }, `Worth another look: ${mine.missed}`));
     $('#retry').hidden = !mine.canRetry;
+    // a little party for a right answer, a good score or a better retry
+    const good = mine.auto?.choice === 'right' || mine.improved || mine.breakdown.steps.some((x) => /^Answer [23]\/3/.test(x.label));
+    if (good && !fast) celebrate({ count: 70, ms: 2000 });
   });
 }
 $('#result-close').onclick = () => ($('#result').hidden = true);

@@ -69,3 +69,31 @@
   .sheet td.opts .btn { margin: 2px 4px 2px 0; }
   .sheet textarea { min-height: 180px; }
 }
+
+/* ---- fun: reactions, hats ---------------------------------------------------- */
+.hud { flex-wrap: wrap; align-items: center; }
+.hud .btn.small { align-self: center; }
+.wardrobe { width: min(520px, 100%); max-height: 92vh; overflow: auto; }
+.wardrobe h2 { margin: 0; color: var(--gold); }
+.wardrobe .row { display: flex; justify-content: flex-end; margin-top: 10px; }
+.hat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 8px; }
+.hat-grid button {
+  background: var(--bg2);
+  border: 2px solid transparent;
+  border-radius: 6px;
+  padding: 8px 4px;
+  cursor: pointer;
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  font-size: 13px;
+}
+.hat-grid button[aria-pressed='true'] { border-color: var(--gold); background: #3b2e6b; }
+.hat-grid button:disabled { cursor: default; opacity: 0.55; }
+.hat-grid button:disabled canvas { filter: grayscale(1) brightness(0.6); }
+.hat-grid .hint { font-size: 11px; color: var(--quiet); }
+.hat-grid canvas.avatar { width: 48px; }
+@media (max-width: 999px) {
+  .classbar .next, #conn { display: none; }
+  .hud { gap: 6px; }
+}

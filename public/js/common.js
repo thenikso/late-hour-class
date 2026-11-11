@@ -42,13 +42,15 @@ export async function post(path, body = {}) {
 }
 
 /** Live connection: full state on every change, positions ten times a second. */
-export function connect(query, { onState, onPos, onGone, onStatus }) {
+export function connect(query, { onState, onPos, onGone, onStatus, onFx, onBall }) {
   let es;
   let dead = false;
   const open = () => {
     es = new EventSource(`/events?${new URLSearchParams(query)}`);
     es.addEventListener('state', (e) => onState(JSON.parse(e.data)));
     es.addEventListener('pos', (e) => onPos && onPos(JSON.parse(e.data)));
+    es.addEventListener('fx', (e) => onFx && onFx(JSON.parse(e.data)));
+    es.addEventListener('ball', (e) => onBall && onBall(JSON.parse(e.data)));
     es.addEventListener('kicked', () => {
       dead = true;
       es.close();
@@ -145,6 +147,88 @@ export const sound = {
     o.stop(audio.currentTime + 0.13);
   },
 };
+
+// Little tunes: lists of [semitones above the base note, start in ms].
+const TUNES = {
+  handin: [[7, 0], [12, 90]],
+  emote: [[9, 0]],
+  hat: [[4, 0], [7, 80], [12, 160]],
+  allin: [[0, 0], [4, 100], [7, 200], [12, 300], [16, 420]],
+  level: [[0, 0], [5, 110], [9, 220], [12, 330], [17, 440], [24, 600]],
+  finale: [[0, 0], [0, 150], [0, 300], [7, 450], [5, 700], [7, 850], [12, 1000]],
+  timeup: [[12, 0], [7, 160]],
+};
+sound.tune = function (name) {
+  for (const [step, at] of TUNES[name] || []) setTimeout(() => this.blip(step, 'triangle'), at);
+};
+
+/** A toast: a short message that slides in at the top and leaves by itself. */
+export function toast(text, { icon = null, ms = 4500 } = {}) {
+  let box = $('#toasts');
+  if (!box) document.body.append((box = h('div', { id: 'toasts', class: 'toasts', 'aria-live': 'polite' })));
+  const el = h('div', { class: 'toast panel' }, icon, h('span', {}, text));
+  box.append(el);
+  setTimeout(() => el.classList.add('out'), ms);
+  setTimeout(() => el.remove(), ms + 400);
+}
+
+/** Confetti over the whole page for a couple of seconds. Pixel squares, no images. */
+export function celebrate({ ms = 2600, count = 120 } = {}) {
+  if (reduced() || document.hidden) return;
+  const c = h('canvas', { class: 'confetti' });
+  c.width = Math.ceil(innerWidth / 4); // drawn small and scaled up: chunky pixels
+  c.height = Math.ceil(innerHeight / 4);
+  document.body.append(c);
+  const g = c.getContext('2d');
+  const colors = ['#ff5d5d', '#ffcf4a', '#5ee08a', '#4cb3ff', '#ff8ad8', '#c39bff'];
+  const bits = Array.from({ length: count }, (_, i) => ({
+    x: Math.random() * c.width,
+    y: -Math.random() * c.height * 0.6,
+    vx: (Math.random() - 0.5) * 20,
+    vy: 40 + Math.random() * 50,
+    w: 1 + (i % 2),
+    color: colors[i % colors.length],
+    wob: Math.random() * 6,
+  }));
+  const t0 = performance.now();
+  const step = (t) => {
+    const k = (t - t0) / 1000;
+    g.clearRect(0, 0, c.width, c.height);
+    g.globalAlpha = Math.min(1, (ms - (t - t0)) / 500);
+    for (const b of bits) {
+      g.fillStyle = b.color;
+      g.fillRect(Math.round(b.x + b.vx * k + Math.sin(k * 5 + b.wob) * 2), Math.round(b.y + b.vy * k), b.w, b.w);
+    }
+    if (t - t0 < ms) requestAnimationFrame(step);
+    else c.remove();
+  };
+  requestAnimationFrame(step);
+}
+
+/** "1:05" from milliseconds left. */
+export const clock = (ms) => {
+  const s = Math.max(0, Math.ceil(ms / 1000));
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+};
+
+/** The class goal bar: level, progress to the next reward. */
+export function classBar(el, k) {
+  if (!k) return;
+  const span = Math.max(1, k.to - k.from);
+  const pct = k.next ? Math.max(0, Math.min(100, ((k.total - k.from) / span) * 100)) : 100;
+  const sig = `${k.level}|${Math.round(pct)}|${k.next}`;
+  if (el.dataset.sig === sig) return;
+  const first = !el.dataset.sig;
+  el.dataset.sig = sig;
+  el.innerHTML = '';
+  el.title = k.next ? `Everyone's points together: ${k.total} of ${k.to} for the next room reward` : 'The class earned every room reward';
+  el.append(
+    h('span', { class: 'lvl' }, `Class Lv ${k.level}`),
+    h('span', { class: 'meter' }, h('span', { class: 'fill', style: `width:${pct}%` })),
+    h('span', { class: 'quiet next' }, k.next ? `next: ${k.next}` : 'all unlocked!'),
+  );
+  if (!first) bump(el.querySelector('.lvl'));
+}
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const reduced = () => matchMedia('(prefers-reduced-motion: reduce)').matches;

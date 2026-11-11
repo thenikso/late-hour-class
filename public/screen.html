@@ -35,6 +35,34 @@
       .board ol, .board ul { margin: 0 0 6px; padding-left: 22px; }
       .tools { position: fixed; right: 12px; bottom: 12px; z-index: 30; display: flex; gap: 6px; }
       body.full .screen-frame { z-index: 35; }
+      .klass { position: fixed; left: 12px; top: 12px; z-index: 21; font-size: 16px; }
+      .klass .meter { width: 160px; height: 14px; }
+      .board .classbar { display: flex; align-items: center; margin-top: 6px; }
+      .qbar .count .timer { display: block; font-size: 22px; margin-top: 4px; }
+      .levelup { position: fixed; left: 50%; top: 38%; transform: translate(-50%, -50%); z-index: 60; text-align: center; border-color: var(--gold); padding: 20px 36px; animation: pop 0.4s ease-out; }
+      .levelup h1 { margin: 0; font-size: 44px; color: var(--gold); text-shadow: 4px 4px 0 #0b0716; }
+      .levelup p { margin: 6px 0 0; font-size: 24px; }
+      .finale { position: fixed; inset: 0; z-index: 55; background: rgba(10, 6, 20, 0.93); display: grid; place-items: center; }
+      .finale .inner { width: min(1000px, 92vw); max-height: 96vh; overflow: auto; text-align: center; }
+      .finale h1 { font-size: 46px; color: var(--gold); margin: 0 0 4px; text-shadow: 4px 4px 0 #0b0716; }
+      .podium { display: flex; justify-content: center; align-items: flex-end; gap: 18px; margin: 18px 0; }
+      .podium .place { display: grid; justify-items: center; gap: 4px; font-size: 22px; animation: rise 0.6s ease-out backwards; }
+      .podium .place .step { width: 170px; background: var(--panel2); border: 2px solid var(--line); box-shadow: var(--shadow); font-size: 30px; color: var(--gold); display: grid; place-items: center; }
+      .podium .p1 .step { height: 120px; background: #8a6a12; }
+      .podium .p2 .step { height: 84px; }
+      .podium .p3 .step { height: 56px; }
+      .podium .p1 { animation-delay: 1.2s; }
+      .podium .p2 { animation-delay: 0.6s; }
+      .podium .points { font-size: 26px; }
+      .finale .awards { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; font-size: 18px; }
+      .finale .award { text-align: left; min-width: 240px; max-width: 460px; }
+      .finale .award .names { display: flex; flex-wrap: wrap; gap: 4px 14px; }
+      .finale .award h3 { margin: 0 0 4px; color: var(--gold); font-size: 16px; }
+      .finale .award .who { display: flex; gap: 6px; align-items: center; }
+      .finale .award canvas { width: 24px; }
+      .finale .together { margin-top: 16px; font-size: 20px; }
+      @keyframes rise { from { transform: translateY(60px); opacity: 0; } }
+      @media (prefers-reduced-motion: reduce) { .podium .place, .levelup { animation: none; } }
     </style>
   </head>
   <body>
@@ -50,6 +78,9 @@
     <div class="wall panel" id="wall" hidden></div>
     <div class="board panel" id="board" hidden></div>
     <div class="spot panel" id="spot" hidden></div>
+    <div class="klass pill classbar" id="klass" hidden></div>
+    <div class="levelup panel" id="levelup" hidden></div>
+    <div class="finale" id="finale" hidden></div>
     <div class="tools">
       <button class="btn small" id="sound">Sound off</button>
       <button class="btn small" id="full" title="F: the shared page fills the projector">Full screen page (F)</button>

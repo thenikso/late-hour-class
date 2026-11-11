@@ -70,4 +70,7 @@ body { overflow: auto; font-size: 14px; }
 .players li.off { opacity: 0.45; }
 .players li .grow { flex: 1; }
 .players canvas { width: 12px; height: 18px; image-rendering: pixelated; }
+.lost { color: var(--warn); border: 2px solid var(--warn); border-radius: 5px; padding: 0 8px; }
+.classbar { display: flex; gap: 8px; align-items: center; margin-top: 6px; flex-wrap: wrap; }
+.small { font-size: 12px; }
 details summary { cursor: pointer; color: var(--quiet); }

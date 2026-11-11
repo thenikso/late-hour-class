@@ -45,6 +45,7 @@ In the teacher view, type a slide number in **Go to** and press Enter (or click 
 - **Slides:** ◀ ▶, E for the next reveal step (also the arrow keys and E on the keyboard), Go to, and the speaker notes for the current slide.
 - **Questions:** open, close, *Suggest scores* (AI), adjust any score 0–3 and its feedback, *Reveal to everyone*, Spotlight one answer on the projector. Quick questions can be asked on the spot.
 - **Players:** see who is online, remove someone.
+- **Pace and mood:** a soft timer on the open question (1, 2, 3 or 5 minutes; nothing closes by itself), a note in the top bar when students press *I'm lost*, and **Finale** for the last minute of class: a podium, who improved, who never missed a question.
 
 The flags next to answers (short, unmarked parts, mostly pasted, written very fast, close to another answer) are prompts to look or ask, never penalties.
 
@@ -58,9 +59,20 @@ The flags next to answers (short, unmarked parts, mostly pasted, written very fa
 
 Chips × multiplier, counted up on screen. Handing in is worth 10; a right choice 30 (half right 15); a right reason 15; 10 per right grid row; the AI or teacher score is worth 15 per point (0–3). Each correctly marked part adds ×0.5.
 
+Two bonuses reward showing up rather than being right: handing in several questions in a row (+5 for each one in the run, up to +25), and +10 for everyone when the whole room hands in before you close. Missing a question costs nothing.
+
 Retries are never penalised: when the answer missed something, the student gets a *Try again*, up to three attempts, and the best one counts. A better retry earns an IMPROVED badge, and the projector shows "Improved today" next to the top five.
 
 AI scoring sends the question, the rubric and the answers (as a1, a2…, no names) to the CLI on your laptop. If it fails or is slow, score by hand: the buttons work without it.
+
+## The fun parts
+
+- **Reactions:** six bubbles over your avatar (keys 1–6 or the top bar), and Space to hop. *I'm lost* also tells the teacher, quietly; *Got it* clears it.
+- **Hats:** your own points unlock hats; improving an answer on a retry unlocks the scholar cap.
+- **Class goal:** everyone's points fill one bar. Each level adds something to the room for all: fairy lights, a cat, an arcade machine and a ball to kick around in breaks, a disco ball at results time, a golden trophy.
+- **Celebrations:** confetti and a tune when everyone has handed in, when the class levels up, and on your own screen for a good answer. Sound is off until you turn it on.
+
+During a presentation the room stays calm: no hopping, the cat naps, and the slides cover the room.
 
 ## Making a deck game-ready
 
@@ -95,9 +107,10 @@ To run another deck: `node server.js --lesson <teacher deck url> --deck <student
 - `lib/`: the game state (`game.js`), the lesson reader (`manifest.js`), quick checks (`checks.js`), AI scoring (`ai.js`).
 - `public/`: the three pages (student, teacher, projector), the room and avatar drawing, styles.
 - `public/assets/`: the office tileset and the 8 avatar sheets, from The Agency (CC0 1.0, see `public/assets/LICENSE.md`).
+- `tools/cut-sprites.js`: shrinks an AI-drawn sprite sheet to crisp game-size sprites.
 - `example/lectures/`: the Week 8 deck, made game-ready.
 - `data/`: one session file per class, with names and answers. It is git-ignored; keep it off any public repository.
 
 ## Not in this proof of concept
 
-Adventure rooms and doors, trophies, the questions-only chat, avatar unlocks, the rich text and code editors, and sign-in with school accounts. They are in the spec, for later.
+Adventure rooms and doors, concept trophies, the questions-only chat, points that carry over between lessons, the rich text and code editors, and sign-in with school accounts. They are in the spec, for later.

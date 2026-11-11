@@ -1,7 +1,7 @@
 // The projector view: the room, the shared screen, and the big moments
 // (countdowns, the hand-in counter, results and the spotlight).
 
-import { $, h, connect, screenFrame, placeFrame, sound, countTo, bump } from './common.js';
+import { $, h, connect, screenFrame, placeFrame, sound, countTo, bump, celebrate, clock, classBar } from './common.js';
 import { Room, ROOM_SIZE } from './room.js';
 import { avatarCanvas } from './sprites.js';
 import { LETTERS } from './world.js';
@@ -42,8 +42,26 @@ connect(
       render();
     },
     onPos: (list) => room.setPositions(list),
+    onBall: ([x, y]) => room.setBall(x, y),
+    onFx: (ev) => {
+      room.fx(ev);
+      if (ev.t === 'level') levelUp(ev);
+    },
   },
 );
+
+/** The class earned a room reward: say it big, for a few seconds. */
+let levelTimer = null;
+function levelUp(ev) {
+  const box = $('#levelup');
+  box.innerHTML = '';
+  box.append(h('h1', {}, `Class level ${ev.level}!`), h('p', {}, ev.text));
+  box.hidden = false;
+  celebrate({ count: 200, ms: 4000 });
+  sound.tune('level');
+  clearTimeout(levelTimer);
+  levelTimer = setTimeout(() => (box.hidden = true), 6000);
+}
 
 function layout() {
   const top = 8;
@@ -85,9 +103,70 @@ function render() {
     tick();
   } else banner.hidden = true;
 
+  const k = $('#klass');
+  k.hidden = s.mode === 'present' || s.mode === 'review' || full || !!s.finale;
+  classBar(k, s.klass);
+
   renderQbar();
   renderWall();
   renderSpot();
+  renderFinale();
+}
+
+// The soft timer on the open question ticks between server updates.
+let timeUp = false;
+setInterval(() => {
+  const q = state?.question;
+  const el = $('#qtimer');
+  if (!el || !q?.timerEndsAt) return (timeUp = false);
+  const left = q.timerEndsAt - (Date.now() + room.skew);
+  el.textContent = left > 0 ? clock(left) : "time's up";
+  el.classList.toggle('low', left < 15000);
+  if (left <= 0 && !timeUp) sound.tune('timeup');
+  timeUp = left <= 0;
+}, 250);
+
+let finaleSig = '';
+function renderFinale() {
+  const f = state.finale;
+  const box = $('#finale');
+  if (!f) {
+    box.hidden = true;
+    finaleSig = '';
+    return;
+  }
+  const sig = JSON.stringify(f);
+  if (sig === finaleSig) return;
+  const first = !finaleSig;
+  finaleSig = sig;
+  box.hidden = false;
+  box.innerHTML = '';
+  const place = (p, n) => {
+    if (!p) return '';
+    const pts = h('span', { class: 'points' }, first ? '0' : String(p.points));
+    if (first) setTimeout(() => countTo(pts, 0, p.points, 900).then(() => bump(pts)), n === 1 ? 1500 : n === 2 ? 900 : 300);
+    return h('div', { class: `place p${n}` }, avatarCanvas(p.avatar, 5, p.hat || 'none'), h('b', {}, p.name), pts, h('div', { class: 'step' }, n));
+  };
+  const who = (p, extra = '') => h('div', { class: 'who' }, avatarCanvas(p.avatar, 1.5), `${p.name}${extra}`);
+  const awards = h('div', { class: 'awards' });
+  if (f.improved.length) awards.append(h('div', { class: 'award panel' }, h('h3', {}, 'Improved today'), h('div', { class: 'names' }, f.improved.map((p) => who(p, p.improved > 1 ? ` ×${p.improved}` : '')))));
+  if (f.streak.n >= 2)
+    awards.append(h('div', { class: 'award panel' }, h('h3', {}, `Handed in ${f.streak.n} in a row`), h('div', { class: 'names' }, f.streak.players.map((p) => who(p))), f.streak.more ? h('div', { class: 'quiet' }, `and ${f.streak.more} more`) : ''));
+  const k = state.klass;
+  box.append(
+    h(
+      'div',
+      { class: 'inner' },
+      h('h1', {}, "That's a wrap!"),
+      h('div', { class: 'podium' }, place(f.podium[1], 2), place(f.podium[0], 1), place(f.podium[2], 3)),
+      awards,
+      h('p', { class: 'together' }, `Together: ${f.answers} answers to ${f.questions} questions · ${k.total} points · class level ${k.level}`),
+    ),
+  );
+  if (first) {
+    sound.tune('finale');
+    setTimeout(() => celebrate({ count: 260, ms: 5000 }), 1500);
+  }
 }
 
 let timer = null;
@@ -101,6 +180,7 @@ function tick() {
 }
 
 let lastCount = -1;
+let wasAllIn = false;
 function renderQbar() {
   const q = state.question;
   const bar = $('#qbar');
@@ -111,11 +191,17 @@ function renderQbar() {
   }
   bar.hidden = false;
   const allIn = q.status === 'open' && q.online > 0 && q.submitted >= q.online;
+  if (allIn && !wasAllIn) {
+    // the whole room handed in: a small party, and the team bonus is theirs
+    celebrate({ count: 90, ms: 2200 });
+    sound.tune('allin');
+  }
+  wasAllIn = allIn;
   const status = q.status === 'open' ? (allIn ? 'Everyone is in!' : 'handed in') : 'closed · scoring';
   bar.innerHTML = '';
   bar.append(
     h('div', { class: 'text' }, h('h2', {}, q.title), h('p', {}, q.prompt)),
-    h('div', { class: `count ${allIn ? 'all-in' : ''}` }, h('span', { id: 'qcount' }, `${q.submitted}/${q.online}`), h('small', {}, status)),
+    h('div', { class: `count ${allIn ? 'all-in' : ''}` }, h('span', { id: 'qcount' }, `${q.submitted}/${q.online}`), h('small', {}, status), q.timerEndsAt ? h('span', { class: 'timer', id: 'qtimer' }) : ''),
   );
   if (q.submitted !== lastCount) {
     if (lastCount >= 0) {
@@ -194,6 +280,10 @@ function renderWall() {
   const b = state.board;
   board.append(h('h3', {}, 'Top 5'), h('ol', {}, b.top.map((p) => h('li', {}, `${p.name} `, h('span', { class: 'points' }, p.points)))));
   if (b.improved.length) board.append(h('h3', {}, 'Improved today'), h('ul', {}, b.improved.map((p) => h('li', {}, `${p.name} ×${p.improved}`))));
+  if (q.fullHouse) board.append(h('p', { class: 'ok' }, 'Everyone handed in: +10 each'));
+  const bar = h('div', { class: 'classbar' });
+  board.append(bar);
+  classBar(bar, state.klass);
 }
 
 function renderSpot() {

@@ -271,4 +271,13 @@ Built:
 - Student deck copy with notes and work-slide answers stripped, served on the LAN; the full deck stays on localhost.
 - Session JSON in `data/`, `--resume` after a restart; 9 automated tests.
 
-Not built yet: submit gate that blocks moving on (the counter and "everyone is in" are there, the lock isn't), adventure rooms and doors, trophies, opinion line, hot seat walk-up, question chat, cosmetic rewards and points across lessons, ProseMirror/CodeMirror, pair tables, spot the bug, code bench, `postMessage` commands beyond the E cue, sound design beyond simple blips.
+Added on 11 November 2026, the "fun layer" (see `CLAUDE.md` for the rules):
+
+- Reactions (six emote bubbles, a hop) with a quiet "I'm lost" signal to the teacher.
+- Hats unlocked by points or by improving on a retry (the first cosmetic rewards from this spec).
+- A class goal: points together unlock room rewards (fairy lights, a cat, a games corner with a kickable ball, a disco ball, a trophy). This is the cooperative counterweight to the leaderboard.
+- Bonuses for handing in: a streak bonus and a team bonus when everyone is in.
+- A soft timer on questions, a spotlight pool of light on the avatar, points rising from avatars at the reveal, confetti and short tunes, and a Finale with a podium.
+- Hat, emote, cat and prop sprites drawn with `codex` and cut with `tools/cut-sprites.js`.
+
+Not built yet: submit gate that blocks moving on (the counter and "everyone is in" are there, the lock isn't), adventure rooms and doors, concept trophies, opinion line, hot seat walk-up, question chat, points across lessons, ProseMirror/CodeMirror, pair tables, spot the bug, code bench, `postMessage` commands beyond the E cue.

@@ -2,8 +2,8 @@
 // The background is painted once at 16 px per tile and scaled up crisply;
 // names and labels are drawn at screen resolution so they stay sharp.
 
-import { TILE, COLS, ROWS, SCREEN, SEATS, TEACHER_SPOT, zones, seatAt, LETTERS } from './world.js';
-import { drawAvatar, drawTile, tileset, whenReady } from './sprites.js';
+import { TILE, COLS, ROWS, SCREEN, SEATS, TEACHER_SPOT, BALL_HOME, zones, seatAt, LETTERS } from './world.js';
+import { drawAvatar, drawHat, hatRise, drawEmote, drawCat, drawProp, drawBall, drawTile, tileset, whenReady } from './sprites.js';
 
 const W = COLS * TILE;
 const H = ROWS * TILE;
@@ -70,6 +70,31 @@ function paintBackground(tiles) {
   return c;
 }
 
+// ---- the fun layer: room rewards and little effects ------------------------------
+const PARTY = ['#ff5d5d', '#ffcf4a', '#5ee08a', '#4cb3ff', '#ff8ad8', '#c39bff'];
+const still = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+// The class cat pads between these spots. Its path depends only on the clock,
+// so every screen in the room sees the cat in the same place.
+const CAT_SPOTS = [[16, 7.4], [16, 16.4], [5, 16.4], [27, 16.4], [2.5, 7.6], [29.5, 7.8], [10, 16.5], [21.5, 16.4]];
+const CAT_LEG = 9000; // ms: walk for the first half, then sit or nap
+const rnd = (i) => {
+  let x = Math.imul(i ^ 0x9e3779b9, 0x85ebca6b);
+  x ^= x >>> 13;
+  x = Math.imul(x, 0xc2b2ae35);
+  return ((x ^ (x >>> 16)) >>> 0) / 4294967296;
+};
+function catAt(now, calm) {
+  if (calm) return { x: 29.5, y: 7.8, pose: 'sleep', flip: false }; // naps through explanations
+  const i = Math.floor(now / CAT_LEG);
+  const k = (now % CAT_LEG) / CAT_LEG;
+  const a = CAT_SPOTS[Math.floor(rnd(i) * CAT_SPOTS.length)];
+  const b = CAT_SPOTS[Math.floor(rnd(i + 1) * CAT_SPOTS.length)];
+  const w = Math.min(1, k / 0.5);
+  if (w < 1 && a !== b) return { x: a[0] + (b[0] - a[0]) * w, y: a[1] + (b[1] - a[1]) * w, pose: Math.floor(now / 180) % 2 ? 'walk' : 'stand', flip: b[0] < a[0] };
+  return { x: b[0], y: b[1], pose: rnd(i + 999) < 0.35 ? 'sleep' : 'sit', flip: rnd(i + 5) < 0.5 };
+}
+
 export class Room {
   constructor(canvas) {
     this.canvas = canvas;
@@ -82,6 +107,44 @@ export class Room {
     this.scale = 2;
     this.dpr = 1;
     this.showNames = true;
+    // short-lived effects
+    this.emotes = new Map(); // player id -> { e, t0 }
+    this.hops = new Map(); // player id -> start time
+    this.floats = []; // { id, text, color, t0 }
+    this.sparks = []; // { x, y, vx, vy, color, t0 }
+    this.ball = { x: BALL_HOME.x, y: BALL_HOME.y, rx: BALL_HOME.x, ry: BALL_HOME.y };
+    this.skew = 0; // server clock minus ours
+  }
+
+  /** An event from the server's fx stream. */
+  fx(ev) {
+    const t = performance.now();
+    if (ev.t === 'emote') this.emotes.set(ev.id, { e: ev.e, t0: t });
+    if (ev.t === 'hop' && !still()) this.hops.set(ev.id, t);
+    if (ev.t === 'handin') this.sparkle(ev.id);
+  }
+
+  /** A few pixels of confetti popping out of one avatar. */
+  sparkle(id, n = 12) {
+    const p = this.players.get(id);
+    if (!p || still()) return;
+    const t0 = performance.now();
+    for (let i = 0; i < n; i++)
+      this.sparks.push({ x: (p.rx + 0.5) * TILE, y: (p.ry - 0.2) * TILE, vx: (Math.random() - 0.5) * 60, vy: -30 - Math.random() * 50, color: PARTY[i % PARTY.length], t0 });
+  }
+
+  /** A short text that rises from an avatar, like "+85". */
+  float(id, text, color = '#ffcf4a') {
+    this.floats.push({ id, text, color, t0: performance.now() });
+  }
+
+  setBall(x, y) {
+    this.ball.x = x;
+    this.ball.y = y;
+  }
+
+  has(reward) {
+    return !!this.state?.klass?.unlocked.includes(reward);
   }
 
   fit(availW, availH) {
@@ -106,6 +169,21 @@ export class Room {
 
   setState(state) {
     this.state = state;
+    this.skew = (state.serverNow || Date.now()) - Date.now();
+    if (state.ball) this.setBall(state.ball[0], state.ball[1]);
+    // Results just came out: the points rise from each avatar.
+    const q = state.question;
+    const first = !this.shown;
+    this.shown = this.shown || new Map();
+    if (q?.status === 'revealed')
+      for (const w of q.wall || []) {
+        const k = `${q.key}:${w.pid}`;
+        if (this.shown.get(k) === w.points) continue;
+        this.shown.set(k, w.points);
+        if (first) continue;
+        this.float(w.pid, `+${w.points}`, w.improved ? '#5ee08a' : '#ffcf4a');
+        if (w.improved) this.sparkle(w.pid, 18);
+      }
     const seen = new Set();
     for (const p of state.players) {
       seen.add(p.id);
@@ -150,35 +228,64 @@ export class Room {
     const zoneQ = q && q.kind === 'choice' && q.zones && q.status !== 'closed-hidden' ? q : null;
     if (zoneQ) this.drawZones(zoneQ, t);
 
+    this.drawRewards(t);
+
     const list = [...this.players.values()].filter((p) => p.online || p.meta.id === this.selfId);
     for (const p of list) {
       p.rx += (p.x - p.rx) * 0.3;
       p.ry += (p.y - p.ry) * 0.3;
     }
     list.sort((a, b) => a.ry - b.ry);
+    const spot = this.state?.spotlight?.pid;
     for (const p of list) {
       const fx = (p.rx + 0.5) * TILE;
       const fy = (p.ry + 0.85) * TILE;
       const seat = p.moving ? -1 : seatAt(p.rx, p.ry);
       p.sitting = seat >= 0 && Math.abs(p.rx - SEATS[seat].x) < 0.15 && Math.abs(p.ry - SEATS[seat].y) < 0.15;
+      // a hop: a short arc, 350 ms
+      const hop = this.hops.get(p.meta.id);
+      const hk = hop && !p.sitting ? (t - hop) / 350 : 1;
+      if (hop && hk >= 1) this.hops.delete(p.meta.id);
+      const up = hk < 1 ? Math.round(Math.sin(Math.PI * hk) * 7) : 0;
+      if (p.meta.id === spot) {
+        // on the spot: a pool of light
+        g.fillStyle = 'rgba(255, 233, 150, 0.16)';
+        g.beginPath();
+        g.moveTo(fx - 3, fy - 60);
+        g.lineTo(fx + 3, fy - 60);
+        g.lineTo(fx + 12, fy);
+        g.lineTo(fx - 12, fy);
+        g.fill();
+        g.fillStyle = 'rgba(255, 233, 150, 0.4)';
+        g.beginPath();
+        g.ellipse(fx, fy, 12, 4, 0, 0, Math.PI * 2);
+        g.fill();
+      }
+      let head;
+      const ay = p.sitting ? fy + 4 : fy - up;
       if (p.sitting) {
-        drawAvatar(g, p.meta.avatar, 'sit', 'up', 0, fx, fy + 4);
+        head = drawAvatar(g, p.meta.avatar, 'sit', 'up', 0, fx, ay);
       } else {
         g.fillStyle = 'rgba(0,0,0,0.3)';
-        g.fillRect(fx - 5, fy - 1, 10, 2);
+        g.fillRect(fx - 5 + (up ? 1 : 0), fy - 1, 10 - (up ? 2 : 0), 2);
         const phase = (p.meta.avatar * 97) % 400; // idle breathing out of step
         const frame = p.moving ? Math.floor(t / 130) % 4 : Math.floor((t + phase) / 280) % 4;
-        drawAvatar(g, p.meta.avatar, p.moving ? 'walk' : 'idle', p.dir || 'down', frame, fx, fy);
+        head = drawAvatar(g, p.meta.avatar, p.moving ? 'walk' : 'idle', p.dir || 'down', frame, fx, ay);
       }
+      if (p.meta.hat && head) drawHat(g, p.meta.hat, head, fx, ay);
+      // where labels start: above the head, and above the hat if there is one
+      p.labelY = fy - (p.sitting ? 17 : 25) - hatRise(p.meta.hat);
       if (p.meta.id === this.selfId) {
         const bob = Math.sin(t / 200) * 1.5;
-        const top = fy - (p.sitting ? 20 : 28);
+        const top = p.labelY - 3 - up;
         g.fillStyle = '#ffcf4a';
         g.fillRect(fx - 2, top + bob, 5, 2);
         g.fillRect(fx - 1, top + 2 + bob, 3, 2);
         g.fillRect(fx, top + 4 + bob, 1, 1);
       }
     }
+    this.drawSparks(t);
+    this.drawEmotes(t, list);
 
     // labels at screen resolution
     g.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
@@ -190,7 +297,7 @@ export class Room {
       g.textBaseline = 'bottom';
       for (const p of list) {
         const x = (p.rx + 0.5) * TILE * this.scale;
-        const y = ((p.ry + 0.85) * TILE - (p.sitting ? 17 : 25)) * this.scale;
+        const y = p.labelY * this.scale;
         const name = p.meta.name;
         const w = g.measureText(name).width + 8;
         g.fillStyle = 'rgba(11,7,22,0.7)';
@@ -199,6 +306,154 @@ export class Room {
         g.fillText(name, x, y + 1);
       }
     }
+    this.drawFloats(t);
+  }
+
+  /** What the class has earned together: lights, the cat, the games corner, the disco ball, the trophy. */
+  drawRewards(t) {
+    const g = this.g;
+    const mode = this.state?.mode;
+    const party = mode === 'review' || !!this.state?.finale;
+    if (this.has('lights')) {
+      const step = still() ? 0 : Math.floor(t / 450);
+      for (const [x0, x1] of [[0.6, 10], [22, 31.4]]) {
+        const n = 12;
+        let px = null;
+        for (let i = 0; i <= n; i++) {
+          const u = i / n;
+          const x = Math.round((x0 + (x1 - x0) * u) * TILE);
+          const y = Math.round((0.7 + Math.sin(Math.PI * u) * 0.7) * TILE);
+          if (px) {
+            g.strokeStyle = '#1b1230';
+            g.lineWidth = 1;
+            g.beginPath();
+            g.moveTo(px[0] + 0.5, px[1] + 0.5);
+            g.lineTo(x + 0.5, y + 0.5);
+            g.stroke();
+          }
+          px = [x, y];
+          if (i === 0 || i === n) continue;
+          const lit = (i + step) % 3 !== 0;
+          g.fillStyle = PARTY[i % PARTY.length];
+          g.globalAlpha = lit ? 1 : 0.45;
+          g.fillRect(x - 1, y + 1, 3, 3);
+          if (lit) {
+            g.globalAlpha = 0.25;
+            g.fillRect(x - 2, y, 5, 5);
+          }
+          g.globalAlpha = 1;
+        }
+      }
+    }
+    if (this.has('trophy')) drawProp(g, 'trophy', 23.6 * TILE, 8.1 * TILE);
+    if (this.has('games')) {
+      drawProp(g, 'arcade', 11 * TILE, 17.9 * TILE);
+      // the ball rolls only in free roam; otherwise it waits by the machine
+      const b = this.ball;
+      const [bx, by] = mode === 'free' ? [b.x, b.y] : [BALL_HOME.x, BALL_HOME.y];
+      b.rx += (bx - b.rx) * 0.35;
+      b.ry += (by - b.ry) * 0.35;
+      const x = (b.rx + 0.5) * TILE;
+      const y = (b.ry + 0.85) * TILE;
+      g.fillStyle = 'rgba(0,0,0,0.3)';
+      g.fillRect(x - 4, y - 1, 8, 2);
+      drawBall(g, x, y);
+    }
+    if (this.has('disco')) {
+      drawProp(g, 'disco', 8.5 * TILE, 3.4 * TILE);
+      g.fillStyle = '#1b1230';
+      g.fillRect(8.5 * TILE, 0, 1, 1.3 * TILE);
+      if (party && !still()) {
+        // slow coloured spots sweeping the floor
+        for (let i = 0; i < 6; i++) {
+          const a = t / 1400 + (i * Math.PI) / 3;
+          g.fillStyle = PARTY[i];
+          g.globalAlpha = 0.16;
+          g.beginPath();
+          g.ellipse((16 + Math.cos(a) * (6 + i * 1.4)) * TILE, (12 + Math.sin(a * 1.3) * 3.6) * TILE, 22, 9, 0, 0, Math.PI * 2);
+          g.fill();
+        }
+        g.globalAlpha = 1;
+      }
+    }
+    if (this.has('cat')) {
+      const c = catAt(Date.now() + this.skew, mode === 'present' || mode === 'seating' || still());
+      const x = (c.x + 0.5) * TILE;
+      const y = (c.y + 0.85) * TILE;
+      g.fillStyle = 'rgba(0,0,0,0.3)';
+      g.fillRect(x - 5, y - 1, 10, 2);
+      drawCat(g, c.pose, x, y, c.flip);
+      if (c.pose === 'sleep' && !still()) {
+        g.fillStyle = '#f6f0ff';
+        const z = Math.floor(t / 600) % 3;
+        g.fillRect(x + 6 + z, y - 16 - z * 3, 2, 1);
+        g.fillRect(x + 7 + z, y - 15 - z * 3, 1, 1);
+        g.fillRect(x + 6 + z, y - 14 - z * 3, 2, 1);
+      }
+    }
+  }
+
+  drawSparks(t) {
+    const g = this.g;
+    this.sparks = this.sparks.filter((s) => t - s.t0 < 900);
+    for (const s of this.sparks) {
+      const k = (t - s.t0) / 1000;
+      g.fillStyle = s.color;
+      g.fillRect(Math.round(s.x + s.vx * k), Math.round(s.y + s.vy * k + 120 * k * k), 2, 2);
+    }
+  }
+
+  /** Emote bubbles: a small white bubble over the head for a couple of seconds. */
+  drawEmotes(t, list) {
+    const g = this.g;
+    for (const p of list) {
+      const em = this.emotes.get(p.meta.id);
+      if (!em) continue;
+      const age = t - em.t0;
+      if (age > 2600) {
+        this.emotes.delete(p.meta.id);
+        continue;
+      }
+      const x = Math.round((p.rx + 0.5) * TILE) - 8;
+      const rise = age < 120 ? 3 - Math.round(age / 40) : 0; // pops up into place
+      const y = Math.round(p.labelY - (this.showNames ? 9 : 2)) - 17 + rise;
+      g.globalAlpha = age > 2200 ? 1 - (age - 2200) / 400 : 1;
+      g.fillStyle = '#1b1230';
+      g.fillRect(x + 1, y, 14, 16);
+      g.fillRect(x, y + 1, 16, 14);
+      g.fillRect(x + 6, y + 16, 4, 1);
+      g.fillRect(x + 7, y + 17, 2, 1);
+      g.fillStyle = '#f6f0ff';
+      g.fillRect(x + 2, y + 1, 12, 14);
+      g.fillRect(x + 1, y + 2, 14, 12);
+      g.fillRect(x + 7, y + 15, 2, 1);
+      drawEmote(g, em.e, x + 2, y + 2);
+      g.globalAlpha = 1;
+    }
+  }
+
+  drawFloats(t) {
+    const g = this.g;
+    this.floats = this.floats.filter((f) => t - f.t0 < 2200);
+    const size = Math.max(12, Math.round(6 * this.scale));
+    g.font = `bold ${size}px Monocraft, ui-monospace, monospace`;
+    g.textAlign = 'center';
+    g.textBaseline = 'bottom';
+    g.lineJoin = 'round';
+    for (const f of this.floats) {
+      const p = this.players.get(f.id);
+      if (!p || p.labelY === undefined) continue;
+      const k = (t - f.t0) / 2200;
+      const x = (p.rx + 0.5) * TILE * this.scale;
+      const y = (p.labelY - 12 - (still() ? 8 : k * 16)) * this.scale;
+      g.globalAlpha = k > 0.75 ? (1 - k) * 4 : 1;
+      g.strokeStyle = 'rgba(11,7,22,0.9)';
+      g.lineWidth = Math.max(3, this.scale * 1.4);
+      g.strokeText(f.text, x, y);
+      g.fillStyle = f.color;
+      g.fillText(f.text, x, y);
+    }
+    g.globalAlpha = 1;
   }
 
   drawZones(q, t) {

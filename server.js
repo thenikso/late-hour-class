@@ -126,8 +126,12 @@ export async function start(opts = {}) {
       push(c, 'state', viewFor(c));
     }
   });
+  game.onFx((event) => {
+    for (const c of clients) push(c, 'fx', event);
+  });
   let lastPos = '';
   const tick = setInterval(() => {
+    if (game.stepBall(0.1)) for (const c of clients) push(c, 'ball', [+game.ball.x.toFixed(2), +game.ball.y.toFixed(2)]);
     const pos = JSON.stringify(game.positions());
     if (pos === lastPos) return;
     lastPos = pos;
@@ -181,6 +185,11 @@ export async function start(opts = {}) {
         if (action === 'move') {
           game.move(p, body.x, body.y, body.dir, body.moving);
           return json(res, 200, { ok: true, mode: game.mode });
+        }
+        if (action === 'emote') return json(res, 200, { ok: game.emote(p, body.e) });
+        if (action === 'hat') {
+          game.setHat(p, body.hat);
+          return json(res, 200, { ok: true });
         }
         if (action === 'answer') {
           const a = game.submit(p, body);
@@ -253,6 +262,12 @@ async function teacherAction(game, action, b) {
       break;
     case 'spotlight':
       game.setSpotlight(b.pid || null);
+      break;
+    case 'timer':
+      game.setTimer(b.seconds);
+      break;
+    case 'finale':
+      game.setFinale(b.on !== false);
       break;
     case 'kick':
       game.kick(b.pid);

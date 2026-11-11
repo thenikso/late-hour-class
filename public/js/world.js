@@ -18,6 +18,7 @@ export const SEATS = SEAT_ROWS.flatMap((y) => SEAT_COLS.map((x) => ({ x, y })));
 
 export const TEACHER_SPOT = { x: 28, y: 6.2 };
 export const SPAWN = { x: 16, y: 7.6 };
+export const BALL_HOME = { x: 12.5, y: 16.4 }; // where the break-time ball rests
 
 export const clampToFloor = (x, y) => ({
   x: Math.max(FLOOR.x, Math.min(FLOOR.x + FLOOR.w - 1, x)),

@@ -1,4 +1,5 @@
-import { $, h, post, connect, screenFrame } from './common.js';
+import { $, h, post, connect, screenFrame, classBar } from './common.js';
+import { CLASS_LEVELS } from './fun.js';
 import { Room } from './room.js';
 import { avatarCanvas } from './sprites.js';
 import { LETTERS } from './world.js';
@@ -33,6 +34,7 @@ $('#goto').addEventListener('keydown', (e) => {
   if (e.key === 'Enter') go(Number(e.target.value));
 });
 const go = (n) => act('slide', { slide: n });
+$('#finale').onclick = () => act('finale', { on: !state?.finale });
 
 addEventListener('keydown', (e) => {
   if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName)) return;
@@ -50,6 +52,8 @@ connect(
       render();
     },
     onPos: (list) => room.setPositions(list),
+    onBall: ([x, y]) => room.setBall(x, y),
+    onFx: (ev) => room.fx(ev),
     onGone: () => alertBar('Wrong teacher key: use the link printed when the server started.'),
     onStatus: (ok) => {
       $('#conn').textContent = ok ? 'live' : 'reconnecting…';
@@ -82,6 +86,13 @@ function render() {
   $('#seat').classList.toggle('on', s.mode === 'seating');
   if (s.notesUrl && s.screen.slide) notes.update({ screen: s.screen }, s.notesUrl);
   $('#notes-box').hidden = !s.notesUrl;
+  $('#finale').classList.toggle('on', !!s.finale);
+  // Students who pressed "I'm lost" on this slide (they clear it with "Got it").
+  $('#lost').hidden = !s.lost.length;
+  $('#lost').textContent = s.lost.length ? `? ${s.lost.length} lost: ${s.lost.join(', ')}` : '';
+  classBar($('#klass'), s.klass);
+  const got = CLASS_LEVELS.slice(0, s.klass.level).map((l) => l.name);
+  $('#klass-note').textContent = got.length ? `In the room: ${got.join(', ')}.` : 'Everyone\'s points together unlock things for the room.';
   renderSlides();
   renderQuestion();
   renderPlayers();
@@ -258,6 +269,13 @@ function liveQuestion(q) {
     );
   if (q.status !== 'open') row.append(h('button', { class: 'btn go', onclick: () => act('reveal') }, q.status === 'revealed' ? 'Reveal again' : 'Reveal to everyone'));
   if (s.spotlight) row.append(h('button', { class: 'btn', onclick: () => act('spotlight', { pid: null }) }, 'Clear spotlight'));
+  if (q.status === 'open') {
+    // a soft countdown on every screen; nothing closes by itself
+    row.append(h('span', { class: 'quiet' }, 'Timer'));
+    for (const m of [1, 2, 3, 5]) row.append(h('button', { class: 'btn small', title: `Show a ${m} minute countdown`, onclick: () => act('timer', { seconds: m * 60 }) }, `${m}m`));
+    if (q.timerEndsAt) row.append(h('button', { class: 'btn small', onclick: () => act('timer', { seconds: 0 }) }, 'off'));
+  }
+  if (q.fullHouse) wrap.append(h('p', { class: 'ok' }, 'Everyone handed in: +10 each at the reveal.'));
   row.append(h('button', { class: 'btn small', onclick: () => act('seat', { seconds: Number($('#seat-s').value) || 20 }) }, 'Back to seats'));
   wrap.append(row);
   if (q.scoringError) wrap.append(h('p', { class: 'err' }, `Scoring failed: ${q.scoringError}. You can score by hand below, or try again.`));

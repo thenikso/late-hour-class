@@ -19,8 +19,12 @@
     <div class="hud">
       <div class="pill" id="me"></div>
       <div class="pill"><span class="mode-label" id="mode">…</span></div>
+      <div class="pill classbar" id="klass"></div>
+      <div class="pill emotes" id="emotes" role="group" aria-label="Reactions"></div>
       <div class="grow"></div>
-      <a class="pill" id="open-screen" target="_blank" rel="noopener" hidden>Open the screen in a tab ↗</a>
+      <button class="btn small" id="hats-open" title="Hats you have unlocked">Hats</button>
+      <button class="btn small" id="sound" title="Sounds on this laptop">Sound off</button>
+      <a class="pill" id="open-screen" target="_blank" rel="noopener" title="Open the shared screen in its own tab" hidden>Screen ↗</a>
       <span class="pill quiet" id="conn">connecting…</span>
     </div>
     <div class="banner panel" id="banner" hidden></div>
@@ -37,6 +41,15 @@
         <button class="btn go" type="submit">Enter the room →</button>
         <p class="quiet small">Points here are just for fun: they never count toward your grade.</p>
       </form>
+    </div>
+
+    <div class="modal" id="hats" hidden>
+      <div class="panel wardrobe">
+        <h2>Hats</h2>
+        <p class="quiet small">Points unlock hats. They are just for show.</p>
+        <div class="hat-grid" id="hat-grid"></div>
+        <div class="row"><button class="btn" id="hats-close">Back to the room</button></div>
+      </div>
     </div>
 
     <div class="modal" id="result" hidden>
