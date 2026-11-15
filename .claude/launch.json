@@ -4,7 +4,7 @@
     {
       "name": "example-mock",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "example:mock"],
+      "runtimeArgs": ["run", "example:mock", "--", "--data", "data/preview"],
       "port": 3000
     }
   ]

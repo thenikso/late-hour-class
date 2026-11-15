@@ -97,3 +97,14 @@
   .classbar .next, #conn { display: none; }
   .hud { gap: 6px; }
 }
+
+/* ---- the questions board and the trophy shelf ---------------------------------- */
+.wardrobe form.row { display: flex; gap: 8px; justify-content: stretch; }
+.ask-list { list-style: none; padding: 0; margin: 8px 0 0; display: grid; gap: 6px; }
+.ask-list li { display: flex; gap: 8px; align-items: baseline; background: var(--bg2); border-radius: 4px; padding: 6px 8px; }
+.ask-list .grow { flex: 1; overflow-wrap: anywhere; }
+.trophy { display: grid; grid-template-columns: 48px 1fr; gap: 10px; align-items: start; background: var(--bg2); border: 2px solid transparent; border-radius: 6px; padding: 8px; margin-top: 8px; }
+.trophy.focus { border-color: var(--gold); }
+.trophy p { margin: 4px 0 0; }
+.trophy a { color: var(--chips); }
+.hint { position: fixed; left: 50%; bottom: 14px; transform: translateX(-50%); z-index: 26; cursor: pointer; color: var(--gold); font: inherit; }

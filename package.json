@@ -10,7 +10,7 @@
     "example": "node tools/run-example.js",
     "example:mock": "node tools/run-example.js --ai mock",
     "slides": "node tools/serve-slides.js",
-    "font": "node tools/fetch-font.js",
+    "report": "node tools/report.js",
     "test": "node --test test/*.test.js"
   }
 }

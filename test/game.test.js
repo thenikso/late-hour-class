@@ -7,7 +7,12 @@ import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { start } from '../server.js';
-import { zones, optionOrder, BALL_HOME } from '../public/js/world.js';
+import { zones, optionOrder, BALL_HOME, HOT_SEAT, FLOOR } from '../public/js/world.js';
+import { Game } from '../lib/game.js';
+import { loadLesson } from '../lib/manifest.js';
+import { loadTerm } from '../lib/term.js';
+import { sessionReport } from '../lib/report.js';
+import { looksLikeQuestion } from '../lib/asks.js';
 import { classProgress, CLASS_LEVELS } from '../public/js/fun.js';
 import { parseMarks } from '../public/js/marks.js';
 import { studentCopy } from '../tools/serve-slides.js';
@@ -257,7 +262,8 @@ test('everyone handing in earns the whole room a bonus, and a soft timer never c
   // One student misses the next one: no team bonus, and nobody loses anything.
   await teacher('open', { def: { key: 'team2', kind: 'choice', title: 'Quick poll 2', prompt: 'Again?', options: ['Yes', 'No'], correct: null, zones: false, scored: false } });
   for (const s of students.slice(0, 3)) await post('/api/answer', { token: s.token, choice: 0 });
-  await teacher('close');
+  await assert.rejects(teacher('close'), /still writing: Di/, 'the gate: someone is still writing');
+  await teacher('close', { force: true });
   assert.equal(game.records.team2.fullHouse, false);
   const before = game.players.get(students[3].id).points;
   await teacher('reveal');
@@ -308,4 +314,153 @@ test('the finale shows a podium of three, the improvers and the longest streak',
   assert.ok(f.answers >= 10);
   await teacher('mode', { mode: 'free' });
   assert.equal(game.screenView().finale, null, 'any room change ends it');
+});
+
+// ---- the gate, the hot seat, the opinion line -------------------------------------------
+
+test('the submit gate holds the room until everyone handed in, unless the teacher overrides', async () => {
+  for (const s of students) game.setOnline(game.players.get(s.id), +1);
+  await teacher('open', { def: { key: 'gate', kind: 'choice', title: 'Gate', prompt: 'Ready?', options: ['Yes', 'No'], correct: null, zones: false, scored: false } });
+  for (const s of students.slice(0, 2)) await post('/api/answer', { token: s.token, choice: 0 });
+  for (const action of ['close', 'reveal', 'score']) await assert.rejects(teacher(action), /2 still writing: Cy, Di/);
+  await assert.rejects(teacher('mode', { mode: 'present' }), /still writing/, 'slides would cover the question');
+  await assert.rejects(teacher('open', { key: 'a' }), /still writing/, 'another question would replace it');
+  assert.equal(game.records.gate.status, 'open');
+  assert.equal(game.studentView(game.players.get(students[0].id)).question.waitingFor, undefined, 'the class never sees who is still writing');
+  await teacher('slide', { slide: 26 }); // looking at another slide is not moving on
+  for (const s of students.slice(2)) await post('/api/answer', { token: s.token, choice: 1 });
+  await teacher('close');
+  assert.equal(game.records.gate.status, 'scored');
+  assert.ok(game.records.gate.allInAt >= game.records.gate.openedAt, 'the report knows when everyone was in');
+  await teacher('reveal');
+});
+
+test('spotlight walks the student to the hot seat and back; pick chooses someone who answered', async () => {
+  const cy = game.players.get(students[2].id);
+  await post('/api/move', { token: students[2].token, x: 20, y: 12, dir: 'left', moving: false });
+  const warp = cy.warp;
+  await teacher('spotlight', { pid: cy.id });
+  assert.deepEqual([cy.x, cy.y], [HOT_SEAT.x, HOT_SEAT.y]);
+  assert.equal(cy.warp, warp + 1);
+  await post('/api/move', { token: students[2].token, x: 3, y: 9, warp });
+  assert.equal(cy.x, HOT_SEAT.x, 'a move sent before the browser saw the walk-up is ignored');
+  assert.equal(game.screenView().spotlight.choice, 'No', 'the projector shows the words, not an option number');
+  await teacher('spotlight', { pid: null });
+  assert.deepEqual([cy.x, cy.y], [20, 12], 'back where they stood');
+  await teacher('pick');
+  assert.ok(game.records.gate.answers[game.spotlight.pid]);
+  await teacher('spotlight', { pid: null });
+});
+
+test('an opinion line reads where students stand and never marks anyone right or wrong', async () => {
+  await teacher('open', { def: { key: 'line', kind: 'line', title: 'Opinion', prompt: 'Tests first?', labels: ['Never', 'Always'] } });
+  const xs = [FLOOR.x, FLOOR.x + (FLOOR.w - 1) / 2, FLOOR.x + FLOOR.w - 1, FLOOR.x + FLOOR.w - 1];
+  for (const [i, s] of students.entries()) {
+    await post('/api/move', { token: s.token, x: xs[i], y: 10 });
+    await post('/api/answer', { token: s.token, value: 3 }); // the browser cannot claim a position
+  }
+  assert.deepEqual(students.map((s) => game.records.line.answers[s.id].attempts[0].value), [0, 50, 100, 100]);
+  assert.equal(game.studentView(game.players.get(students[0].id)).question.spread, undefined, 'the spread waits for the reveal');
+  await teacher('reveal');
+  const q = game.screenView().question;
+  assert.deepEqual(q.spread, [1, 0, 1, 0, 2]);
+  assert.equal(q.average, 63);
+  assert.ok(game.records.line.answers[students[0].id].attempts[0].breakdown.steps.every((s) => !/right/i.test(s.label)));
+  for (const s of students) game.setOnline(game.players.get(s.id), -1);
+});
+
+// ---- the questions board ---------------------------------------------------------------------
+
+test('questions go on the board, anything else is held for the teacher, and votes earn a few points', async () => {
+  assert.equal(looksLikeQuestion('Why do we need two explanations?'), true);
+  assert.equal(looksLikeQuestion('how does the retry work'), true);
+  assert.equal(looksLikeQuestion('this is boring'), false);
+  const [ada, bo, cy] = students;
+  const view = (s) => game.studentView(game.players.get(s.id));
+
+  assert.equal((await post('/api/ask', { token: ada.token, text: 'Why do we need two explanations?' })).status, 'posted');
+  await assert.rejects(post('/api/ask', { token: ada.token, text: 'And why three?' }), /wait/, 'one at a time');
+  assert.equal((await post('/api/ask', { token: bo.token, text: 'pizza pizza pizza' })).status, 'held');
+  assert.deepEqual(view(cy).asks.map((a) => a.text), ['Why do we need two explanations?'], 'held messages stay off the board');
+  assert.equal(view(bo).asks.find((a) => a.mine).status, 'held', 'but their author sees them waiting');
+  assert.equal(game.teacherView().asks.length, 2);
+
+  const id = view(cy).asks[0].id;
+  const before = game.players.get(ada.id).points;
+  await assert.rejects(post('/api/vote', { token: ada.token, id }), /yours/);
+  await post('/api/vote', { token: cy.token, id });
+  await post('/api/vote', { token: bo.token, id });
+  assert.equal(view(ada).asks[0].votes, 2);
+  assert.equal(game.players.get(ada.id).points, before + 5, 'a voted question is worth 5, however many votes');
+  await post('/api/vote', { token: bo.token, id });
+  assert.equal(view(ada).asks[0].votes, 1, 'a second press takes the vote back');
+
+  assert.equal(game.screenView().asks, null);
+  await teacher('show-asks', { on: true });
+  assert.equal(game.screenView().asks[0].votes, 1);
+  await teacher('ask-status', { id, status: 'answered' });
+  assert.deepEqual(game.screenView().asks, []);
+  await teacher('show-asks', { on: false });
+});
+
+// ---- trophies and the term ------------------------------------------------------------------------
+
+test('a concept trophy is earned at the reveal and carries a link to its slide', async () => {
+  const seen = [];
+  const off = game.onFx((e) => seen.push(e));
+  assert.deepEqual(game.lesson.trophies.map((t) => t.after), ['a', 'm']);
+  assert.equal(game.screenView().trophies.length, 0);
+  await teacher('open', { key: 'a' });
+  await teacher('reveal');
+  const [t] = game.screenView().trophies;
+  assert.equal(t.name, 'Gone is not fixed');
+  assert.equal(t.url, 'http://127.0.0.1:1/week-08-slides.html#3');
+  assert.ok(seen.some((e) => e.t === 'trophy'));
+  await teacher('reveal');
+  assert.equal(game.shelf.length, 1, 'only once');
+  await teacher('trophy', { id: 'm' }); // the teacher can also award one by hand
+  assert.deepEqual(game.teacherView().lessonTrophies.map((x) => x.earned), [true, true]);
+  off();
+});
+
+test('points and trophies carry over to the next lesson through the term file', async () => {
+  await game.save();
+  const term = await loadTerm(game.termFile);
+  const ada = game.players.get(students[0].id);
+  assert.equal(term.players.ada.points, ada.points);
+  assert.equal(term.trophies.length, 2);
+
+  // Next week: a new game, the same term file.
+  const next = new Game({ lesson: await loadLesson(DECK), dataDir, aiMode: 'mock', term, termFile: null, log: () => {} });
+  const again = next.join('ADA', 0);
+  assert.equal(again.points, 0, "today's board starts at zero");
+  assert.equal(next.studentView(again).me.term.points, ada.points);
+  assert.equal(next.studentView(again).me.rank, null);
+  next.setHat(again, 'cap'); // unlocked by the term total
+  assert.equal(next.screenView().trophies.length, 2, 'the shelf is still full');
+  assert.equal(next.join('Newcomer', 1).carried, 0);
+  clearTimeout(next._emit);
+  clearTimeout(next._save);
+});
+
+test("the class sees the top 5, a student sees their own place, and nobody else's points", () => {
+  const view = game.studentView(game.players.get(students[0].id));
+  assert.equal(view.me.rank, 1);
+  assert.ok(view.board.top.length <= 5);
+  assert.ok(view.players.every((p) => !('points' in p)));
+  assert.ok(game.teacherView().players.every((p) => 'points' in p));
+});
+
+test('the session report gives hand-in rates without names unless asked', async () => {
+  await game.save();
+  const data = JSON.parse(await readFile(game.sessionFile, 'utf8'));
+  const report = sessionReport(data);
+  assert.match(report, /\| Gate \| 4\/4 \(100%\)/);
+  assert.match(report, /Hand-in target/);
+  assert.match(report, /Why do we need two explanations\?/);
+  assert.ok(!report.includes('Ada'));
+  assert.match(sessionReport(data, { names: true }), /\| Ada \|/);
+  const r = await fetch(`${base}/report?key=${srv.key}`);
+  assert.equal(r.status, 200);
+  assert.equal((await fetch(`${base}/report?key=nope`)).status, 403);
 });

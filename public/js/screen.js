@@ -45,22 +45,23 @@ connect(
     onBall: ([x, y]) => room.setBall(x, y),
     onFx: (ev) => {
       room.fx(ev);
-      if (ev.t === 'level') levelUp(ev);
+      if (ev.t === 'level') bigNews(`Class level ${ev.level}!`, ev.text, { count: 200, ms: 4000 });
+      if (ev.t === 'trophy') bigNews(`New trophy: ${ev.name}`, ev.text, { count: 120, ms: 3000 });
     },
   },
 );
 
-/** The class earned a room reward: say it big, for a few seconds. */
-let levelTimer = null;
-function levelUp(ev) {
+/** The class earned something (a room reward, a trophy): say it big, for a few seconds. */
+let newsTimer = null;
+function bigNews(title, text, confetti) {
   const box = $('#levelup');
   box.innerHTML = '';
-  box.append(h('h1', {}, `Class level ${ev.level}!`), h('p', {}, ev.text));
+  box.append(h('h1', {}, title), h('p', {}, text));
   box.hidden = false;
-  celebrate({ count: 200, ms: 4000 });
+  celebrate(confetti);
   sound.tune('level');
-  clearTimeout(levelTimer);
-  levelTimer = setTimeout(() => (box.hidden = true), 6000);
+  clearTimeout(newsTimer);
+  newsTimer = setTimeout(() => (box.hidden = true), 6000);
 }
 
 function layout() {
@@ -110,6 +111,7 @@ function render() {
   renderQbar();
   renderWall();
   renderSpot();
+  renderAsks();
   renderFinale();
 }
 
@@ -222,7 +224,7 @@ function renderWall() {
     wallSig = '';
     return;
   }
-  const sig = JSON.stringify([q.key, q.wall?.map((w) => w.points)]);
+  const sig = JSON.stringify([q.key, q.wall?.map((w) => w.points), q.example]);
   if (sig === wallSig) return;
   wallSig = sig;
   wall.hidden = false;
@@ -259,9 +261,19 @@ function renderWall() {
       );
     });
 
+  if (q.kind === 'line') {
+    const most = Math.max(1, ...q.spread);
+    wall.append(
+      h('div', { class: 'stat' }, h('b', {}, `${q.labels[0]} ◀ … ▶ ${q.labels[1]}`)),
+      ...q.spread.map((n, i) => h('div', { class: 'stat' }, h('span', { class: 'quiet' }, `${i * 20}–${i * 20 + 20} `), h('span', { class: 'bar', style: `width:${(n / most) * 200}px` }), String(n))),
+    );
+  }
+  if (q.example) wall.append(h('div', { class: 'card example' }, h('div', { class: 'who' }, 'One sound answer'), h('div', {}, q.example)));
+
   const hasText = (q.wall || []).some((w) => w.text);
   let i = 0;
   for (const w of q.wall || []) {
+    if (q.kind === 'line') break; // the avatars on the floor are the result
     if (!hasText && i >= 8) break;
     const pts = h('span', { class: 'points' }, '0');
     const card = h(
@@ -298,6 +310,20 @@ function renderSpot() {
   box.append(
     h('div', { class: 'q' }, sp.question),
     h('h2', {}, h('span', {}, avatarCanvas(sp.avatar, 2)), ` ${sp.name}`),
-    sp.text ? h('div', { html: marksToHtml(sp.text) }) : h('div', {}, sp.choice !== null && sp.choice !== undefined ? `Chose option ${sp.choice + 1}` : ''),
+    sp.choice ? h('div', { class: 'q' }, `Chose: ${sp.choice}`) : '',
+    sp.text ? h('div', { html: marksToHtml(sp.text) }) : '',
+  );
+}
+
+/** The questions students asked the teacher, most wanted first (when the teacher puts them up). */
+function renderAsks() {
+  const asks = state.asks;
+  const box = $('#asks');
+  box.hidden = !asks || !!state.finale;
+  if (box.hidden) return;
+  box.innerHTML = '';
+  box.append(
+    h('h2', {}, 'Your questions'),
+    asks.length ? h('ol', {}, asks.map((it) => h('li', {}, h('span', { class: 'votes' }, `▲ ${it.votes}`), h('div', {}, it.text, h('div', { class: 'who' }, it.name))))) : h('p', { class: 'quiet' }, 'No questions yet. Use the Ask button on your screen.'),
   );
 }

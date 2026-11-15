@@ -22,12 +22,15 @@
       <div class="pill classbar" id="klass"></div>
       <div class="pill emotes" id="emotes" role="group" aria-label="Reactions"></div>
       <div class="grow"></div>
+      <button class="btn small" id="asks-open" title="Ask the teacher a question about the lesson">Ask</button>
+      <button class="btn small" id="trophies-open" title="What the class has learned so far" hidden>Trophies</button>
       <button class="btn small" id="hats-open" title="Hats you have unlocked">Hats</button>
       <button class="btn small" id="sound" title="Sounds on this laptop">Sound off</button>
       <a class="pill" id="open-screen" target="_blank" rel="noopener" title="Open the shared screen in its own tab" hidden>Screen ↗</a>
       <span class="pill quiet" id="conn">connecting…</span>
     </div>
     <div class="banner panel" id="banner" hidden></div>
+    <button class="hint pill" id="hint" hidden></button>
 
     <section class="sheet panel" id="sheet" hidden></section>
 
@@ -46,9 +49,32 @@
     <div class="modal" id="hats" hidden>
       <div class="panel wardrobe">
         <h2>Hats</h2>
-        <p class="quiet small">Points unlock hats. They are just for show.</p>
+        <p class="quiet small">Points unlock hats. They are just for show. <span id="hat-total"></span></p>
         <div class="hat-grid" id="hat-grid"></div>
         <div class="row"><button class="btn" id="hats-close">Back to the room</button></div>
+      </div>
+    </div>
+
+    <div class="modal" id="asks" hidden>
+      <div class="panel wardrobe">
+        <h2>Ask the teacher</h2>
+        <p class="quiet small">Questions about the lesson go on the board for everyone. Press ▲ on one you were wondering about too.</p>
+        <form class="row" id="ask-form">
+          <input type="text" id="ask-text" maxlength="200" placeholder="What would you like to ask?" autocomplete="off" />
+          <button class="btn go" type="submit">Ask</button>
+        </form>
+        <p id="ask-note" class="ok"></p>
+        <ul class="ask-list" id="ask-list"></ul>
+        <div class="row"><button class="btn" id="asks-close">Back to the room</button></div>
+      </div>
+    </div>
+
+    <div class="modal" id="trophies" hidden>
+      <div class="panel wardrobe">
+        <h2>Trophies</h2>
+        <p class="quiet small">One for each idea the class has practised. They stay on the shelf all term.</p>
+        <div id="trophy-list"></div>
+        <div class="row"><button class="btn" id="trophies-close">Back to the room</button></div>
       </div>
     </div>
 

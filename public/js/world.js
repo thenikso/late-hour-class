@@ -19,6 +19,13 @@ export const SEATS = SEAT_ROWS.flatMap((y) => SEAT_COLS.map((x) => ({ x, y })));
 export const TEACHER_SPOT = { x: 28, y: 6.2 };
 export const SPAWN = { x: 16, y: 7.6 };
 export const BALL_HOME = { x: 12.5, y: 16.4 }; // where the break-time ball rests
+export const HOT_SEAT = { x: 9, y: 7.2 }; // at the front, clear of the door where students arrive
+
+// Concept trophies sit on two shelves on the front wall, left and right of the screen.
+// A slot is the top-left corner of one trophy, in tiles.
+const SHELF_ROWS = [5.3, 4.1];
+const SHELF_COLS = [2, 3, 4, 5, 6, 7, 8, 9, 22, 23, 24, 25, 26, 27, 28, 29];
+export const TROPHY_SLOTS = SHELF_ROWS.flatMap((y) => SHELF_COLS.map((x) => ({ x, y })));
 
 export const clampToFloor = (x, y) => ({
   x: Math.max(FLOOR.x, Math.min(FLOOR.x + FLOOR.w - 1, x)),
@@ -47,6 +54,19 @@ export function zoneAt(count, x, y) {
   const cx = x + 0.5;
   const cy = y + 0.5;
   return z.findIndex((r) => cx >= r.x && cx < r.x + r.w && cy >= r.y && cy < r.y + r.h);
+}
+
+/** The opinion line: where a player stands across the floor, from 0 (far left) to 100 (far right). */
+export function lineValue(x) {
+  const k = (x - FLOOR.x) / (FLOOR.w - 1);
+  return Math.round(Math.max(0, Math.min(1, k)) * 100);
+}
+
+/** Which trophy slot a player is standing under (-1 if none): close to the wall, below the shelf. */
+export function trophyNear(count, x, y) {
+  if (y > 8) return -1;
+  const i = TROPHY_SLOTS.findIndex((s) => Math.abs(s.x - x) < 0.6);
+  return i >= 0 && i < count ? i : -1;
 }
 
 /** Display order of a choice question's options (deterministic shuffle by key). */

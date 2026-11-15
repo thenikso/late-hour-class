@@ -67,3 +67,7 @@ export function classProgress(total, students, floorLevel = 0) {
 /** Bonus chips for handing in several questions in a row (never for being right or fast). */
 export const streakChips = (before) => 5 * Math.min(5, Math.max(0, before));
 export const FULL_HOUSE_CHIPS = 10;
+
+/** A question to the teacher that classmates voted for earns its author a few points. */
+export const ASK_CHIPS = 5;
+export const ASK_CHIPS_MAX = 15;

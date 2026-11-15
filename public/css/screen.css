@@ -1,0 +1,67 @@
+/* The projector view. Shared styles are in game.css. */
+.room-wrap { position: absolute; }
+.stage { place-items: start center; }
+.join { position: fixed; left: 12px; bottom: 12px; z-index: 20; font-size: 18px; }
+.join b { color: var(--gold); }
+.qbar { position: fixed; left: 12px; right: 300px; bottom: 12px; max-width: 1100px; z-index: 22; display: flex; gap: 18px; align-items: center; }
+.qbar .text { flex: 1; }
+.qbar h2 { margin: 0; color: var(--gold); font-size: 22px; }
+.qbar p { margin: 2px 0 0; font-size: 17px; }
+.qbar .count { font-size: 46px; color: var(--gold); text-align: center; line-height: 1; }
+.qbar .count small { display: block; font-size: 13px; color: var(--quiet); }
+.all-in { color: var(--good) !important; }
+.wall { position: fixed; right: 12px; top: 12px; bottom: 12px; width: min(560px, 38vw); z-index: 24; overflow: auto; }
+.wall h2 { margin: 0 0 6px; color: var(--gold); }
+.wall .card { background: var(--bg2); border-radius: 6px; padding: 8px 10px; margin: 6px 0; border: 2px solid #45367a; }
+.wall .card .who { display: flex; gap: 8px; align-items: center; font-weight: bold; }
+.wall .card .who .grow { flex: 1; }
+.wall .card .who .points { font-size: 20px; }
+.stat { margin: 6px 0; }
+.stat .bar { display: inline-block; height: 14px; background: var(--chips); vertical-align: middle; margin: 0 6px; border: 1px solid var(--line); }
+.stat.right .bar { background: var(--good); }
+/* The answer on the spot sits at the bottom, so its author stays visible at the front of the room. */
+.spot { position: fixed; left: 50%; bottom: 12px; transform: translateX(-50%); width: min(900px, 80vw); max-height: 52vh; overflow: auto; z-index: 40; font-size: 24px; }
+.spot h2 { margin: 0 0 8px; color: var(--gold); }
+.spot .q { font-size: 15px; color: var(--quiet); }
+.board { position: fixed; left: 12px; top: 12px; z-index: 23; min-width: 240px; }
+.board h3 { margin: 0 0 4px; color: var(--gold); font-size: 15px; }
+.board ol, .board ul { margin: 0 0 6px; padding-left: 22px; }
+.tools { position: fixed; right: 12px; bottom: 12px; z-index: 30; display: flex; gap: 6px; }
+body.full .screen-frame { z-index: 35; }
+.klass { position: fixed; left: 12px; top: 12px; z-index: 21; font-size: 16px; }
+.klass .meter { width: 160px; height: 14px; }
+.board .classbar { display: flex; align-items: center; margin-top: 6px; }
+.qbar .count .timer { display: block; font-size: 22px; margin-top: 4px; }
+.levelup { position: fixed; left: 50%; top: 38%; transform: translate(-50%, -50%); z-index: 60; text-align: center; border-color: var(--gold); padding: 20px 36px; animation: pop 0.4s ease-out; }
+.levelup h1 { margin: 0; font-size: 44px; color: var(--gold); text-shadow: 4px 4px 0 #0b0716; }
+.levelup p { margin: 6px 0 0; font-size: 24px; }
+.finale { position: fixed; inset: 0; z-index: 55; background: rgba(10, 6, 20, 0.93); display: grid; place-items: center; }
+.finale .inner { width: min(1000px, 92vw); max-height: 96vh; overflow: auto; text-align: center; }
+.finale h1 { font-size: 46px; color: var(--gold); margin: 0 0 4px; text-shadow: 4px 4px 0 #0b0716; }
+.podium { display: flex; justify-content: center; align-items: flex-end; gap: 18px; margin: 18px 0; }
+.podium .place { display: grid; justify-items: center; gap: 4px; font-size: 22px; animation: rise 0.6s ease-out backwards; }
+.podium .place .step { width: 170px; background: var(--panel2); border: 2px solid var(--line); box-shadow: var(--shadow); font-size: 30px; color: var(--gold); display: grid; place-items: center; }
+.podium .p1 .step { height: 120px; background: #8a6a12; }
+.podium .p2 .step { height: 84px; }
+.podium .p3 .step { height: 56px; }
+.podium .p1 { animation-delay: 1.2s; }
+.podium .p2 { animation-delay: 0.6s; }
+.podium .points { font-size: 26px; }
+.finale .awards { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; font-size: 18px; }
+.finale .award { text-align: left; min-width: 240px; max-width: 460px; }
+.finale .award .names { display: flex; flex-wrap: wrap; gap: 4px 14px; }
+.finale .award h3 { margin: 0 0 4px; color: var(--gold); font-size: 16px; }
+.finale .award .who { display: flex; gap: 6px; align-items: center; }
+.finale .award canvas { width: 24px; }
+.finale .together { margin-top: 16px; font-size: 20px; }
+@keyframes rise { from { transform: translateY(60px); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .podium .place, .levelup { animation: none; } }
+
+/* the questions students asked, when the teacher puts them up */
+.asks { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(980px, 84vw); z-index: 38; font-size: 26px; }
+.asks h2 { margin: 0 0 10px; color: var(--gold); }
+.asks ol { margin: 0; padding: 0; list-style: none; display: grid; gap: 10px; }
+.asks li { display: grid; grid-template-columns: 70px 1fr; gap: 12px; align-items: baseline; }
+.asks .votes { color: var(--gold); text-align: right; }
+.asks .who { font-size: 15px; color: var(--quiet); }
+.wall .card.example { border-color: var(--good); }

@@ -74,3 +74,12 @@ body { overflow: auto; font-size: 14px; }
 .classbar { display: flex; gap: 8px; align-items: center; margin-top: 6px; flex-wrap: wrap; }
 .small { font-size: 12px; }
 details summary { cursor: pointer; color: var(--quiet); }
+
+/* errors and the submit gate's "move on anyway" */
+.alerts { position: fixed; top: 52px; left: 50%; transform: translateX(-50%); z-index: 30; display: grid; gap: 6px; justify-items: center; }
+.alert { display: flex; gap: 8px; align-items: center; border-color: var(--warn); }
+.missed { font-size: 13px; }
+.asks { list-style: none; padding: 0; margin: 6px 0 0; display: grid; gap: 6px; max-height: 320px; overflow: auto; font-size: 13px; }
+.asks li { background: var(--bg2); border-radius: 4px; padding: 6px; overflow-wrap: anywhere; }
+.asks li.held { outline: 1px dashed var(--warn); }
+select { width: auto; }

@@ -2,12 +2,14 @@
 // The background is painted once at 16 px per tile and scaled up crisply;
 // names and labels are drawn at screen resolution so they stay sharp.
 
-import { TILE, COLS, ROWS, SCREEN, SEATS, TEACHER_SPOT, BALL_HOME, zones, seatAt, LETTERS } from './world.js';
+import { TILE, COLS, ROWS, SCREEN, FLOOR, SEATS, TEACHER_SPOT, BALL_HOME, TROPHY_SLOTS, zones, seatAt, LETTERS } from './world.js';
+import { drawTrophy, TROPHY_SIZE } from './trophies.js';
 import { drawAvatar, drawHat, hatRise, drawEmote, drawCat, drawProp, drawBall, drawTile, tileset, whenReady } from './sprites.js';
 
 const W = COLS * TILE;
 const H = ROWS * TILE;
 const ZONE_COLORS = ['#4cb3ff', '#ffcf4a', '#5ee08a', '#ff8ad8', '#c39bff', '#ff9f5a'];
+const LINE_COLORS = ['#4cb3ff', '#ffcf4a']; // the two ends of an opinion line
 
 // Tile ids in the office tileset (see sprites.js).
 const T = {
@@ -225,9 +227,12 @@ export class Room {
     g.setTransform(k, 0, 0, k, 0, 0);
 
     const q = this.state?.question;
-    const zoneQ = q && q.kind === 'choice' && q.zones && q.status !== 'closed-hidden' ? q : null;
+    const zoneQ = q && q.kind === 'choice' && q.zones ? q : null;
+    const lineQ = q && q.kind === 'line' ? q : null;
     if (zoneQ) this.drawZones(zoneQ, t);
+    if (lineQ) this.drawLine(lineQ);
 
+    this.drawShelf();
     this.drawRewards(t);
 
     const list = [...this.players.values()].filter((p) => p.online || p.meta.id === this.selfId);
@@ -290,6 +295,7 @@ export class Room {
     // labels at screen resolution
     g.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
     if (zoneQ) this.drawZoneLabels(zoneQ);
+    if (lineQ) this.drawLineLabels(lineQ);
     if (this.showNames) {
       const size = Math.max(10, Math.round(4.2 * this.scale));
       g.font = `${size}px Monocraft, ui-monospace, monospace`;
@@ -307,6 +313,69 @@ export class Room {
       }
     }
     this.drawFloats(t);
+  }
+
+  /** Concept trophies, each on its bit of shelf on the front wall. */
+  drawShelf() {
+    const g = this.g;
+    (this.state?.trophies || []).forEach((trophy, i) => {
+      const slot = TROPHY_SLOTS[i];
+      if (!slot) return;
+      const x = slot.x * TILE + (TILE - TROPHY_SIZE) / 2;
+      const y = slot.y * TILE;
+      g.fillStyle = '#5b3a1e';
+      g.fillRect(x - 1, y + TROPHY_SIZE, TROPHY_SIZE + 2, 2);
+      g.fillStyle = 'rgba(0,0,0,0.25)';
+      g.fillRect(x - 1, y + TROPHY_SIZE + 2, TROPHY_SIZE + 2, 1);
+      drawTrophy(g, trophy.sprite, x, y);
+    });
+  }
+
+  /** An opinion line: the floor fades from one colour to the other, with a ruler along the front. */
+  drawLine(q) {
+    const g = this.g;
+    const x0 = (FLOOR.x + 0.5) * TILE;
+    const x1 = (FLOOR.x + FLOOR.w - 0.5) * TILE;
+    const y = (FLOOR.y + 0.55) * TILE;
+    const fade = g.createLinearGradient(x0, 0, x1, 0);
+    fade.addColorStop(0, LINE_COLORS[0]);
+    fade.addColorStop(1, LINE_COLORS[1]);
+    g.fillStyle = fade;
+    g.globalAlpha = 0.14;
+    g.fillRect(FLOOR.x * TILE, (FLOOR.y + 1) * TILE, FLOOR.w * TILE, (FLOOR.h - 1) * TILE);
+    g.globalAlpha = 1;
+    g.fillRect(x0, y, x1 - x0, 3);
+    g.fillStyle = '#1b1230';
+    for (let i = 0; i <= 4; i++) g.fillRect(Math.round(x0 + ((x1 - x0) * i) / 4), y - 2, 1, 7); // quarter marks
+    if (q.status === 'revealed' && q.average !== null && q.average !== undefined) {
+      // where the class stands on average
+      const ax = Math.round(x0 + ((x1 - x0) * q.average) / 100);
+      g.fillStyle = '#f6f0ff';
+      g.fillRect(ax - 2, y - 5, 5, 2);
+      g.fillRect(ax - 1, y - 3, 3, 2);
+      g.fillRect(ax, y - 1, 1, 2);
+    }
+  }
+
+  drawLineLabels(q) {
+    const g = this.g;
+    const s = this.scale;
+    const size = Math.max(11, Math.round(5.5 * s));
+    const y = (FLOOR.y + 1.2) * TILE * s;
+    g.font = `bold ${size}px Monocraft, ui-monospace, monospace`;
+    g.textBaseline = 'top';
+    g.lineJoin = 'round';
+    g.strokeStyle = 'rgba(11,7,22,0.9)';
+    g.lineWidth = Math.max(3, s * 1.6);
+    [
+      ['left', (FLOOR.x + 0.5) * TILE * s, `◀ ${q.labels[0]}`],
+      ['right', (FLOOR.x + FLOOR.w - 0.5) * TILE * s, `${q.labels[1]} ▶`],
+    ].forEach(([align, x, label], i) => {
+      g.textAlign = align;
+      g.fillStyle = LINE_COLORS[i];
+      g.strokeText(label, x, y);
+      g.fillText(label, x, y);
+    });
   }
 
   /** What the class has earned together: lights, the cat, the games corner, the disco ball, the trophy. */

@@ -15,9 +15,12 @@
       <code id="join-url" class="join-url">…</code>
       <span class="lost" id="lost" hidden></span>
       <span class="grow"></span>
+      <a class="btn small" id="report" target="_blank" rel="noopener" title="Hand-in rates, timings and what was missed, for after class">Report ↗</a>
       <a class="btn small" id="open-screen" target="_blank" rel="noopener">Open projector view ↗</a>
       <span class="pill quiet" id="conn">connecting…</span>
     </header>
+
+    <div class="alerts" id="alerts" aria-live="assertive"></div>
 
     <main class="cols">
       <section class="col slides panel">
@@ -59,11 +62,22 @@
           <strong>Players <span class="quiet" id="count"></span></strong>
           <ul class="players" id="players"></ul>
         </div>
+        <div class="panel">
+          <div class="row">
+            <strong class="grow">Students ask <span class="quiet" id="ask-count"></span></strong>
+            <button class="btn small" id="show-asks" title="Show the top questions on the projector">On projector</button>
+          </div>
+          <ul class="asks" id="asks"></ul>
+        </div>
         <div class="panel" id="board"></div>
         <div class="panel">
           <strong>Class goal</strong>
           <div class="classbar" id="klass"></div>
           <p class="quiet small" id="klass-note"></p>
+          <div id="trophies-box" hidden>
+            <strong>Trophies of this lesson</strong>
+            <ul class="qlist" id="trophies"></ul>
+          </div>
         </div>
       </section>
     </main>

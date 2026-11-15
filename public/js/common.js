@@ -37,7 +37,7 @@ export const store = {
 export async function post(path, body = {}) {
   const res = await fetch(path, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw Object.assign(new Error(data.error || `HTTP ${res.status}`), { status: res.status });
+  if (!res.ok) throw Object.assign(new Error(data.error || `HTTP ${res.status}`), { status: res.status, data });
   return data;
 }
 
@@ -76,7 +76,6 @@ export function connect(query, { onState, onPos, onGone, onStatus, onFx, onBall 
   return { close: () => ((dead = true), es.close()) };
 }
 
-/** Keeps an iframe on the shared page; reveals steps in game-ready decks. */
 /**
  * Put the shared page in a box. The page always renders at 1280×720 and is scaled
  * (letterboxed) into the box, so the deck never reflows when the box grows or shrinks:
@@ -95,6 +94,7 @@ export function placeFrame(iframe, r) {
   });
 }
 
+/** Keeps an iframe on the shared page; passes "reveal the next step" on to game-ready decks. */
 export function screenFrame(iframe) {
   let current = null;
   let cueSeen = 0;

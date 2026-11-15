@@ -280,4 +280,17 @@ Added on 11 November 2026, the "fun layer" (see `CLAUDE.md` for the rules):
 - A soft timer on questions, a spotlight pool of light on the avatar, points rising from avatars at the reveal, confetti and short tunes, and a Finale with a podium.
 - Hat, emote, cat and prop sprites drawn with `codex` and cut with `tools/cut-sprites.js`.
 
-Not built yet: submit gate that blocks moving on (the counter and "everyone is in" are there, the lock isn't), adventure rooms and doors, concept trophies, opinion line, hot seat walk-up, question chat, points across lessons, ProseMirror/CodeMirror, pair tables, spot the bug, code bench, `postMessage` commands beyond the E cue.
+Added on 15 November 2026, the day before the first trial:
+
+- The submit gate (v1): closing a question, opening another, or going to Presentation while students are still writing needs the teacher's "anyway". Changing slide is not gated.
+- Hot seat (v2): Spotlight walks the student to the front; "Pick someone" chooses at random among those who answered.
+- Opinion line (v2): a `line` question kind; students stand between two ends.
+- Question chat (v2), as a questions board: a plain rule (not an AI call) decides whether a message looks like a question; the rest is held for the teacher. Votes, top five on the projector, 5 points for a voted question.
+- Concept trophies (v2): `trophies` in the manifest, a shelf on the front wall, a reminder card with a link to the slide. No adventure rooms: the trophy is earned when its question is revealed.
+- Points across lessons: `data/term.json`, matched by name. Today's board starts at zero; hats unlock on the term total; the shelf persists.
+- Each student sees their own place; other students' points are no longer sent to the class at all.
+- A session report (hand-in rate and timings per question, missed concepts, questions asked), to judge the trial by the criteria at the top of this document.
+- "Show a sound answer" after the reveal, a "missed most" tally for the teacher, rename.
+- The server rules are split into small files (`game`, `scoring`, `views`, `asks`, `term`, `report`) and the student page into three.
+
+Not built yet: adventure rooms and doors, side rooms, pair tables, spot the bug, code bench, ProseMirror/CodeMirror, an AI check on the questions board, `postMessage` commands beyond the E cue.

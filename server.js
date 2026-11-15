@@ -1,8 +1,20 @@
 #!/usr/bin/env node
 // Class game engine: one Node process, no dependencies.
-//   node server.js --lesson <deck-url-or-json> [--deck <student deck url>] [--notes <teacher deck url>]
-//                  [--projector <deck url for the projector>] [--port 3000] [--ai claude|codex|mock|off] [--data ./data] [--resume file.json]
+//
+//   node server.js --lesson <deck url or .json> [--deck <student deck url>] [--projector <deck url>]
+//                  [--notes <teacher deck url>] [--port 3000] [--ai claude|codex|mock|off]
+//                  [--data ./data] [--resume file.json] [--term file.json|off] [--no-gate]
+//
 // Students open http://<laptop-ip>:<port>/ ; the teacher opens the /teacher link printed at start.
+//
+// How clients talk to the server:
+//   GET  /events                 a server-sent events stream: `state` (the client's view, on every
+//                                change), `pos` (positions, ten times a second), `fx`, `ball`, `kicked`
+//   POST /api/join               a student enters; the reply holds their token
+//   POST /api/<action>           a student's intention, with their token (see STUDENT_ACTIONS)
+//   POST /api/teacher/<action>   the teacher's controls, with the key from the teacher link
+//   GET  /report                 the session report (teacher key)
+//   GET  anything else           a file from public/
 
 import { createServer } from 'node:http';
 import { readFile, stat } from 'node:fs/promises';
@@ -11,27 +23,63 @@ import { extname, join, normalize, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { randomBytes } from 'node:crypto';
 import { loadLesson } from './lib/manifest.js';
+import { loadTerm } from './lib/term.js';
+import { sessionReport } from './lib/report.js';
+import { cliMissing } from './lib/ai.js';
 import { Game } from './lib/game.js';
 
 const ROOT = dirname(fileURLToPath(import.meta.url));
 const PUBLIC = join(ROOT, 'public');
+const MAX_BODY = 64 * 1024;
 
-function args(argv) {
-  const out = {};
-  for (let i = 0; i < argv.length; i++) {
-    const a = argv[i];
-    if (!a.startsWith('--')) continue;
-    const [k, v] = a.slice(2).split('=');
-    out[k] = v ?? (argv[i + 1] && !argv[i + 1].startsWith('--') ? argv[++i] : true);
-  }
-  return out;
-}
+// ---- what students can do ------------------------------------------------------------
+// Each action gets the game, the player (found by token) and the request body.
 
-export function lanAddress() {
-  for (const list of Object.values(networkInterfaces()))
-    for (const n of list || []) if (n.family === 'IPv4' && !n.internal) return n.address;
-  return 'localhost';
-}
+const STUDENT_ACTIONS = {
+  move: (game, p, b) => ({ ok: game.move(p, b.x, b.y, b.dir, b.moving, b.warp), mode: game.mode }),
+  emote: (game, p, b) => ({ ok: game.emote(p, b.e) }),
+  hat: (game, p, b) => (game.setHat(p, b.hat), { ok: true }),
+  answer: (game, p, b) => ({ ok: true, state: game.submit(p, b).state }),
+  ask: (game, p, b) => ({ ok: true, status: game.ask(p, b.text).status }),
+  vote: (game, p, b) => (game.voteAsk(p, b.id), { ok: true }),
+};
+
+// ---- what the teacher can do ---------------------------------------------------------
+// `force` is the submit gate's override: "move on anyway".
+
+const TEACHER_ACTIONS = {
+  // the room
+  mode: (game, b) => game.setMode(b.mode, { force: b.force }),
+  seat: (game, b) => game.takeSeats(Number(b.seconds) || 20, { force: b.force }),
+  finale: (game, b) => game.setFinale(b.on !== false),
+  // the shared screen
+  slide: (game, b) => game.goSlide(b.slide),
+  cue: (game) => game.cue(),
+  url: (game, b) => game.setScreenUrl(b.url),
+  // questions
+  open: (game, b) => game.open(b.key || b.def, { force: b.force }),
+  close: (game, b) => game.close({ force: b.force }),
+  timer: (game, b) => game.setTimer(b.seconds),
+  score: (game, b) => {
+    if (game.scoring) throw new Error('Already scoring');
+    game.checkGate(b.force);
+    // The AI call runs in the background; results arrive over the event stream.
+    game.score({ force: true }).catch((e) => game.log('scoring:', e.message));
+  },
+  'set-score': (game, b) => game.setScore(b.pid, b.score, b.feedback),
+  reveal: (game, b) => game.reveal({ force: b.force }),
+  example: (game, b) => game.showExample(b.on !== false),
+  spotlight: (game, b) => game.setSpotlight(b.pid || null),
+  pick: (game) => game.pickSpotlight(),
+  // the questions board, trophies, players
+  'ask-status': (game, b) => game.moderateAsk(b.id, b.status),
+  'show-asks': (game, b) => game.setShowAsks(b.on !== false),
+  trophy: (game, b) => game.awardTrophy(b.id),
+  kick: (game, b) => game.kick(b.pid),
+  rename: (game, b) => game.rename(b.pid, b.name),
+};
+
+// ---- small HTTP helpers ----------------------------------------------------------------
 
 const TYPES = {
   '.html': 'text/html; charset=utf-8',
@@ -48,13 +96,17 @@ const TYPES = {
 
 const PAGES = { '/': 'student.html', '/teacher': 'teacher.html', '/screen': 'screen.html' };
 
-async function serveStatic(req, res, pathname) {
-  const file = PAGES[pathname] || pathname.slice(1);
-  const full = normalize(join(PUBLIC, file));
-  if (!full.startsWith(PUBLIC)) return send(res, 403, 'Forbidden');
+function send(res, code, body, type = 'text/plain; charset=utf-8') {
+  res.writeHead(code, { 'content-type': type, 'cache-control': 'no-store' });
+  res.end(typeof body === 'string' ? body : JSON.stringify(body));
+}
+const json = (res, code, body) => send(res, code, body, 'application/json');
+
+async function serveStatic(res, pathname) {
+  const full = normalize(join(PUBLIC, PAGES[pathname] || pathname.slice(1)));
+  if (!full.startsWith(PUBLIC)) return send(res, 403, 'Forbidden'); // no climbing out of public/
   try {
-    const s = await stat(full);
-    if (!s.isFile()) throw new Error('not a file');
+    if (!(await stat(full)).isFile()) throw new Error('not a file');
     res.writeHead(200, { 'content-type': TYPES[extname(full)] || 'application/octet-stream', 'cache-control': 'no-cache' });
     res.end(await readFile(full));
   } catch {
@@ -62,22 +114,17 @@ async function serveStatic(req, res, pathname) {
   }
 }
 
-function send(res, code, body, type = 'text/plain; charset=utf-8') {
-  res.writeHead(code, { 'content-type': type, 'cache-control': 'no-store' });
-  res.end(typeof body === 'string' ? body : JSON.stringify(body));
-}
-const json = (res, code, body) => send(res, code, body, 'application/json');
-
+/** The JSON body of a POST, with a size limit. */
 function readBody(req) {
   return new Promise((ok, fail) => {
     let size = 0;
     const chunks = [];
-    req.on('data', (c) => {
-      size += c.length;
-      if (size > 64 * 1024) {
+    req.on('data', (chunk) => {
+      size += chunk.length;
+      if (size > MAX_BODY) {
         fail(new Error('Body too large'));
         req.destroy();
-      } else chunks.push(c);
+      } else chunks.push(chunk);
     });
     req.on('end', () => {
       try {
@@ -90,126 +137,152 @@ function readBody(req) {
   });
 }
 
+/** `--port 3000 --ai=mock --no-gate` → { port: '3000', ai: 'mock', 'no-gate': true } */
+function parseArgs(argv) {
+  const out = {};
+  for (let i = 0; i < argv.length; i++) {
+    if (!argv[i].startsWith('--')) continue;
+    const [name, value] = argv[i].slice(2).split('=');
+    const next = argv[i + 1];
+    out[name] = value ?? (next && !next.startsWith('--') ? argv[++i] : true);
+  }
+  return out;
+}
+
+/** This laptop's address on the Wi-Fi, for the link students type. */
+export function lanAddress() {
+  for (const list of Object.values(networkInterfaces()))
+    for (const n of list || []) if (n.family === 'IPv4' && !n.internal) return n.address;
+  return 'localhost';
+}
+
+// ---- the server ------------------------------------------------------------------------
+
 export async function start(opts = {}) {
   const port = Number(opts.port || 3000);
   const host = opts.host || lanAddress();
-  const fill = (u) => (u ? String(u).replace(/\{host\}/g, host) : u);
+  const log = opts.quiet ? () => {} : console.log;
+  const fill = (url) => (url ? String(url).replace(/\{host\}/g, host) : url); // "{host}" in a URL means this laptop
   const lessonSrc = fill(opts.lesson);
-  const lesson = await loadLesson(lessonSrc);
-  const key = opts.key || randomBytes(6).toString('hex');
+  const dataDir = resolve(opts.data || join(ROOT, 'data'));
+  const termFile = opts.term === 'off' ? null : resolve(opts.term || join(dataDir, 'term.json'));
+  const key = opts.key || randomBytes(6).toString('hex'); // the teacher's and projector's password, new every run
+
   const game = new Game({
-    lesson,
-    dataDir: resolve(opts.data || join(ROOT, 'data')),
+    lesson: await loadLesson(lessonSrc),
+    dataDir,
     aiMode: opts.ai || 'claude',
-    deckUrl: fill(opts.deck || (lessonSrc && /^https?:/.test(lessonSrc) ? lessonSrc : '')),
+    deckUrl: fill(opts.deck || (/^https?:/.test(lessonSrc || '') ? lessonSrc : '')),
     notesUrl: fill(opts.notes || ''),
     projectorUrl: fill(opts.projector || ''),
-    log: opts.quiet ? () => {} : console.log,
+    term: await loadTerm(termFile, log),
+    termFile,
+    gate: !opts['no-gate'],
+    log,
   });
   if (opts.resume) {
-    const data = JSON.parse(await readFile(opts.resume, 'utf8'));
-    game.restore(data);
+    game.restore(JSON.parse(await readFile(opts.resume, 'utf8')));
     game.sessionFile = resolve(opts.resume);
   }
 
-  const clients = new Set(); // { res, role, player }
-  const push = (c, event, data) => c.res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+  // Everyone listening on /events: { res, role, player }.
+  const clients = new Set();
+  const push = (client, event, data) => client.res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+  const pushAll = (event, data) => clients.forEach((c) => push(c, event, data));
   const viewFor = (c) => (c.role === 'student' ? game.studentView(c.player) : c.role === 'teacher' ? game.teacherView() : game.screenView());
+
   game.onChange(() => {
     for (const c of clients) {
       if (c.role === 'student' && !game.players.has(c.player.id)) {
         push(c, 'kicked', {});
         c.res.end();
         clients.delete(c);
-        continue;
-      }
-      push(c, 'state', viewFor(c));
+      } else push(c, 'state', viewFor(c));
     }
   });
-  game.onFx((event) => {
-    for (const c of clients) push(c, 'fx', event);
-  });
-  let lastPos = '';
+  game.onFx((event) => pushAll('fx', event));
+
+  // The fast tick: the ball and everyone's position, only when something moved.
+  let lastPositions = '';
   const tick = setInterval(() => {
-    if (game.stepBall(0.1)) for (const c of clients) push(c, 'ball', [+game.ball.x.toFixed(2), +game.ball.y.toFixed(2)]);
-    const pos = JSON.stringify(game.positions());
-    if (pos === lastPos) return;
-    lastPos = pos;
-    for (const c of clients) c.res.write(`event: pos\ndata: ${pos}\n\n`);
+    if (game.stepBall(0.1)) pushAll('ball', [+game.ball.x.toFixed(2), +game.ball.y.toFixed(2)]);
+    const positions = JSON.stringify(game.positions());
+    if (positions === lastPositions) return;
+    lastPositions = positions;
+    for (const c of clients) c.res.write(`event: pos\ndata: ${positions}\n\n`);
   }, 100);
-  const keepAlive = setInterval(() => {
-    for (const c of clients) c.res.write(': ping\n\n');
-  }, 15000);
+  // A comment line now and then keeps proxies and browsers from closing a quiet stream.
+  const keepAlive = setInterval(() => clients.forEach((c) => c.res.write(': ping\n\n')), 15000);
 
   const isTeacher = (url) => url.searchParams.get('key') === key;
 
+  function openStream(req, res, url) {
+    const role = url.searchParams.get('role');
+    let client;
+    if (role === 'student') {
+      const player = game.player(url.searchParams.get('token'));
+      if (!player) return json(res, 401, { error: 'Unknown player' });
+      client = { res, role, player };
+      game.setOnline(player, +1);
+    } else if ((role === 'teacher' || role === 'screen') && isTeacher(url)) client = { res, role };
+    else return json(res, 403, { error: 'Wrong key' });
+
+    res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-store', connection: 'keep-alive' });
+    res.write('retry: 1500\n\n');
+    clients.add(client);
+    push(client, 'state', viewFor(client));
+    push(client, 'pos', game.positions());
+    req.on('close', () => {
+      clients.delete(client);
+      if (client.player && game.players.has(client.player.id)) game.setOnline(client.player, -1);
+    });
+  }
+
+  async function handlePost(req, res, url) {
+    const body = await readBody(req);
+    const action = url.pathname.slice('/api/'.length);
+    if (action === 'join') {
+      const p = game.join(body.name, body.avatar);
+      return json(res, 200, { token: p.token, id: p.id });
+    }
+    if (action.startsWith('teacher/')) {
+      if (!isTeacher(url)) return json(res, 403, { error: 'Wrong key' });
+      const run = TEACHER_ACTIONS[action.slice('teacher/'.length)];
+      if (!run) return json(res, 404, { error: 'Unknown teacher action' });
+      run(game, body);
+      return json(res, 200, { ok: true });
+    }
+    const run = STUDENT_ACTIONS[action];
+    if (!run) return json(res, 404, { error: 'Unknown action' });
+    const player = game.player(body.token);
+    if (!player) return json(res, 401, { error: 'Unknown player: join again' });
+    json(res, 200, run(game, player, body));
+  }
+
   const server = createServer(async (req, res) => {
     const url = new URL(req.url, `http://${req.headers.host || 'x'}`);
-    const path = url.pathname;
     try {
-      if (path === '/events') {
-        const role = url.searchParams.get('role');
-        let client;
-        if (role === 'student') {
-          const p = game.player(url.searchParams.get('token'));
-          if (!p) return json(res, 401, { error: 'Unknown player' });
-          client = { res, role, player: p };
-          game.setOnline(p, +1);
-        } else if ((role === 'teacher' || role === 'screen') && isTeacher(url)) client = { res, role };
-        else return json(res, 403, { error: 'Wrong key' });
-        res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-store', connection: 'keep-alive' });
-        res.write('retry: 1500\n\n');
-        clients.add(client);
-        push(client, 'state', viewFor(client));
-        res.write(`event: pos\ndata: ${JSON.stringify(game.positions())}\n\n`);
-        req.on('close', () => {
-          clients.delete(client);
-          if (client.player && game.players.has(client.player.id)) game.setOnline(client.player, -1);
-        });
-        return;
+      if (url.pathname === '/events') return openStream(req, res, url);
+      if (req.method === 'POST' && url.pathname.startsWith('/api/')) return await handlePost(req, res, url);
+      if (req.method !== 'GET') return send(res, 405, 'Method not allowed');
+      if (url.pathname === '/api/info') return json(res, 200, { lesson: game.lesson.title, studentUrl: `http://${host}:${port}/` });
+      if (url.pathname === '/report') {
+        if (!isTeacher(url)) return send(res, 403, 'Wrong key');
+        await game.save();
+        const data = JSON.parse(await readFile(game.sessionFile, 'utf8'));
+        return send(res, 200, sessionReport(data, { names: url.searchParams.has('names') }));
       }
-
-      if (req.method === 'POST' && path.startsWith('/api/')) {
-        const body = await readBody(req);
-        const action = path.slice(5);
-        if (action === 'join') {
-          const p = game.join(body.name, body.avatar);
-          return json(res, 200, { token: p.token, id: p.id });
-        }
-        if (action.startsWith('teacher/')) {
-          if (!isTeacher(url)) return json(res, 403, { error: 'Wrong key' });
-          return json(res, 200, await teacherAction(game, action.slice(8), body));
-        }
-        const p = game.player(body.token);
-        if (!p) return json(res, 401, { error: 'Unknown player: join again' });
-        if (action === 'move') {
-          game.move(p, body.x, body.y, body.dir, body.moving);
-          return json(res, 200, { ok: true, mode: game.mode });
-        }
-        if (action === 'emote') return json(res, 200, { ok: game.emote(p, body.e) });
-        if (action === 'hat') {
-          game.setHat(p, body.hat);
-          return json(res, 200, { ok: true });
-        }
-        if (action === 'answer') {
-          const a = game.submit(p, body);
-          return json(res, 200, { ok: true, state: a.state });
-        }
-        return json(res, 404, { error: 'Unknown action' });
-      }
-
-      if (req.method === 'GET' && path === '/api/info')
-        return json(res, 200, { lesson: game.lesson.title, studentUrl: `http://${host}:${port}/` });
-
-      if (req.method === 'GET') return serveStatic(req, res, path);
-      send(res, 405, 'Method not allowed');
+      return await serveStatic(res, url.pathname);
     } catch (e) {
-      json(res, 400, { error: e.message });
+      // A rule said no (name taken, question closed…). The submit gate answers 409 so the
+      // teacher page can offer "move on anyway".
+      if (e.gate) json(res, 409, { error: e.message, gate: true, waitingFor: e.waitingFor });
+      else json(res, 400, { error: e.message });
     }
   });
 
   await new Promise((ok) => server.listen(port, '0.0.0.0', ok));
-  const info = {
+  return {
     port,
     key,
     game,
@@ -223,74 +296,24 @@ export async function start(opts = {}) {
       return new Promise((ok) => server.close(ok));
     },
   };
-  return info;
 }
 
-async function teacherAction(game, action, b) {
-  switch (action) {
-    case 'mode':
-      game.setMode(b.mode);
-      break;
-    case 'seat':
-      game.takeSeats(Number(b.seconds) || 20);
-      break;
-    case 'slide':
-      game.goSlide(b.slide);
-      break;
-    case 'cue':
-      game.cue();
-      break;
-    case 'url':
-      game.setScreenUrl(b.url);
-      break;
-    case 'open':
-      game.open(b.key || b.def);
-      break;
-    case 'close':
-      game.close();
-      break;
-    case 'score':
-      if (game.scoring) throw new Error('Already scoring');
-      // Runs in the background; results arrive over the event stream.
-      game.score().catch((e) => game.log('scoring:', e.message));
-      break;
-    case 'set-score':
-      game.setScore(b.pid, b.score, b.feedback);
-      break;
-    case 'reveal':
-      game.reveal();
-      break;
-    case 'spotlight':
-      game.setSpotlight(b.pid || null);
-      break;
-    case 'timer':
-      game.setTimer(b.seconds);
-      break;
-    case 'finale':
-      game.setFinale(b.on !== false);
-      break;
-    case 'kick':
-      game.kick(b.pid);
-      break;
-    case 'rename':
-      game.rename(b.pid, b.name);
-      break;
-    default:
-      throw new Error('Unknown teacher action');
-  }
-  return { ok: true };
+/** The lines printed at start: the three links, and a warning if the AI CLI is missing. */
+export function printStartup(s) {
+  const game = s.game;
+  console.log(`\n  ${game.lesson.title}: ${game.lesson.slides.length} slides, ${game.lesson.order.length} questions`);
+  console.log(`  Students:  ${s.studentUrl}`);
+  console.log(`  Teacher:   ${s.teacherUrl}`);
+  console.log(`  Projector: ${s.screenUrl}`);
+  console.log(`  AI scoring: ${game.aiMode}   Session file: ${game.sessionFile}`);
+  const missing = cliMissing(game.aiMode);
+  if (missing) console.log(`\n  ! The "${missing}" command was not found, so score suggestions will fail.\n    Score by hand, or restart with --ai codex | mock | off.`);
+  console.log('');
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  const opts = args(process.argv.slice(2));
-  start(opts)
-    .then((s) => {
-      console.log(`\n  Class game is running (${s.game.lesson.title})`);
-      console.log(`  Students:  ${s.studentUrl}`);
-      console.log(`  Teacher:   ${s.teacherUrl}`);
-      console.log(`  Projector: ${s.screenUrl}`);
-      console.log(`  AI scoring: ${s.game.aiMode}   Session file: ${s.game.sessionFile}\n`);
-    })
+  start(parseArgs(process.argv.slice(2)))
+    .then(printStartup)
     .catch((e) => {
       console.error(e.message);
       process.exit(1);
