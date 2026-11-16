@@ -2,11 +2,14 @@
 // way its kind asks for, hand in, then see the result card and maybe retry.
 //
 // Question kinds: text (with optional marked parts), choice (walk into a zone
-// or pick), grid (one pick per row), line (stand somewhere between two ends).
+// or pick), grid (one pick per row), line (stand somewhere between two ends),
+// bug (click the faulty line) and code (write and run JavaScript); the last
+// two have their editors in code-bench.js.
 
 import { $, h, store, scoreShow, celebrate, clock } from './common.js';
 import { zoneAt, lineValue, LETTERS, CIRCLED } from './world.js';
 import { marksToHtml } from './marks.js';
+import { bugEditor, codeEditor, codeLines, checkList, runChecks } from './code-bench.js';
 
 const isSet = (v) => v !== null && v !== undefined;
 
@@ -19,7 +22,7 @@ export function createSheet({ send, room, layout }) {
   const drafts = {}; // question key -> what the student has typed or picked so far
 
   function draftFor(q) {
-    drafts[q.key] ||= { text: '', choice: null, reason: null, grid: [], pastedChars: 0, activeMs: 0, lastKey: 0 };
+    drafts[q.key] ||= { text: '', choice: null, reason: null, grid: [], line: null, passed: null, pastedChars: 0, activeMs: 0, lastKey: 0 };
     return drafts[q.key];
   }
 
@@ -36,7 +39,8 @@ export function createSheet({ send, room, layout }) {
       drawn = '';
       return;
     }
-    const now = [q.key, q.status, mine?.state, mine?.attempt, editing, !!q.example].join('|');
+    const mates = s.me.partners.map((mate) => mate.name);
+    const now = [q.key, q.status, mine?.state, mine?.attempt, mine?.text, mine?.by, editing, !!q.example, mates].join('|');
     if (now !== drawn) {
       drawn = now;
       el.hidden = false;
@@ -44,6 +48,7 @@ export function createSheet({ send, room, layout }) {
       el.append(h('div', { class: 'sheet-head' }, h('h2', {}, q.title), h('button', { class: 'btn small', title: 'Fold or unfold', onclick: () => (el.classList.toggle('minimised'), layout()) }, '–')));
       if (q.prompt) el.append(h('p', { class: 'prompt' }, q.prompt));
       if (q.context) el.append(h('p', { class: 'context' }, q.context));
+      if (mates.length) el.append(h('p', { class: 'pair' }, `You work with ${mates.join(' and ')}. One answer for all of you: talk it over, then one of you hands in.`));
       const canEdit = (q.status === 'open' && (!mine || editing)) || (q.status === 'revealed' && editing && mine?.canRetry);
       el.append(...(canEdit ? editor(q, mine) : summary(q, mine)));
       if (q.example) el.append(h('p', { class: 'quiet small' }, 'One sound answer:'), h('div', { class: 'feedback' }, q.example));
@@ -57,11 +62,13 @@ export function createSheet({ send, room, layout }) {
     const count = h('span', { class: 'status quiet', id: 'live-count' });
     if (!mine) return [h('p', { class: 'quiet' }, q.status === 'open' ? '' : 'This question is closed.'), h('div', { class: 'row' }, count)];
     const row = h('div', { class: 'row' });
-    if (q.status === 'open') row.append(h('button', { class: 'btn', onclick: startEditing }, 'Change my answer'));
+    const shared = state.me.partners.length > 0;
+    if (q.status === 'open') row.append(h('button', { class: 'btn', onclick: startEditing }, shared ? 'Change our answer' : 'Change my answer'));
     if (mine.state === 'revealed') row.append(h('button', { class: 'btn gold', onclick: () => openResult(true) }, 'See my result'));
     if (mine.canRetry) row.append(h('button', { class: 'btn go', onclick: startRetry }, 'Try again ↻'));
     row.append(count);
-    return [h('p', { class: 'done' }, mine.state === 'revealed' ? 'Scored. See your result.' : '✓ Handed in.'), answerSummary(q, mine), row];
+    const done = mine.state === 'revealed' ? 'Scored. See your result.' : mine.by ? `✓ ${mine.by} handed in for you both.` : '✓ Handed in.';
+    return [h('p', { class: 'done' }, done), answerSummary(q, mine), row];
   }
 
   function answerSummary(q, mine) {
@@ -72,7 +79,12 @@ export function createSheet({ send, room, layout }) {
     }
     if (q.kind === 'grid' && mine.grid) q.rows.forEach((row, i) => box.append(h('div', {}, `${i + 1}. ${(row.options || q.options)[mine.grid[i]] ?? '—'}`)));
     if (q.kind === 'line' && isSet(mine.value)) box.append(h('div', {}, lineText(q, mine.value)));
-    if (mine.text) box.append(h('div', { html: marksToHtml(mine.text) }));
+    if (q.kind === 'bug' && isSet(mine.line)) {
+      // after the reveal the right line shows in green, a wrong pick in red
+      const right = q.correctLines || [];
+      box.append(codeLines(q.code, { mark: (n) => (right.includes(n) ? 'right' : n === mine.line ? (right.length ? 'wrong' : 'picked') : '') }));
+    } else if (q.kind === 'code') box.append(codeLines(mine.text || ''), checkList(q.tests, mine.passed));
+    else if (mine.text) box.append(h('div', { html: marksToHtml(mine.text) }));
     return box;
   }
 
@@ -82,7 +94,10 @@ export function createSheet({ send, room, layout }) {
   function editor(q, mine) {
     const d = draftFor(q);
     if (mine && !d.text && mine.text) d.text = mine.text;
+    if (mine && d.line === null) d.line = mine.line ?? null;
     const out = [];
+    if (q.kind === 'bug') out.push(bugEditor(q, d));
+    if (q.kind === 'code') out.push(codeEditor(q, d));
     if (q.kind === 'choice') out.push(choiceEditor(q, d));
     if (q.kind === 'grid') out.push(gridEditor(q, d));
     if (q.kind === 'line') out.push(h('p', { class: 'quiet', id: 'stand-hint' }));
@@ -96,7 +111,8 @@ export function createSheet({ send, room, layout }) {
     button.onclick = async () => {
       button.disabled = true;
       try {
-        await send('answer', { text: d.text, choice: d.choice, reason: d.reason, grid: d.grid, meta: { pastedChars: d.pastedChars, activeMs: d.activeMs } });
+        if (q.kind === 'code') d.passed = (await runChecks(d.text, q.tests)).passed; // always hand in a fresh result
+        await send('answer', { text: d.text, choice: d.choice, reason: d.reason, grid: d.grid, line: d.line, passed: d.passed, meta: { pastedChars: d.pastedChars, activeMs: d.activeMs } });
         editing = false;
         drawn = ''; // the next state from the server redraws the sheet
       } catch (e) {

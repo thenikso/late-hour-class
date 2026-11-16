@@ -7,9 +7,12 @@ The office tileset (`tiles/office.png`) and the avatar sheets (`avatars/ava_*.pn
 
 ## The fun sheets (`fun/`)
 
-`fun/hats.png`, `fun/emotes.png`, `fun/cat.png` and `fun/props.png` were drawn for this project with the `codex` CLI's image generation (November 2026) and cut down to game size with `tools/cut-sprites.js`. They are not from The Agency.
+`fun/hats.png`, `fun/emotes.png`, `fun/cat.png`, `fun/props.png` and `fun/trophies.png` were drawn for this project with the `codex` CLI's image generation (November 2026) and cut down to game size with `tools/cut-sprites.js`. They are not from The Agency.
 
 - `hats.png`: 8 hats in 16 × 16 px cells (cap, beanie, party hat, headphones, scholar cap, pirate hat, wizard hat, crown).
 - `emotes.png`: 6 icons in 12 × 12 px cells (wave, check, bulb, laugh, heart, question mark).
 - `cat.png`: sit, stand, walk, sleep in 16 × 16 px cells, facing right.
 - `props.png`: arcade machine, disco ball, trophy, ball in 16 × 32 px cells.
+- `trophies.png`: 10 concept trophies in 16 × 16 px cells (cup, star, measuring tape, ladybug, key, book, flask, light bulb, flag, gear).
+
+The solid boxes of the furniture (`js/things.js`) started from the collision shapes in The Agency's map file, also CC0.

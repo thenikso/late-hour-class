@@ -22,6 +22,8 @@ It prints three links:
 
 The key is random each run and only works from the links printed at start. Keep the teacher and projector links to yourself.
 
+To try every kind of question, the three rooms and the trophies without any slides: `npm run demo` (it reads `example/demo-lesson.json`, a lesson written as plain JSON).
+
 Other ways to start it:
 
 ```sh
@@ -44,6 +46,7 @@ In the teacher view, type a slide number in **Go to** and press Enter (or click 
 ## What the teacher can do
 
 - **Room:** Free roam, Take your seat (a countdown, then everyone is seated and the slides fill the screen), Presentation, or share any URL on the screen.
+- **Rooms:** *Door to* Classroom, Open floor or Workshop. The door opens for a few seconds and the class walks through together; anyone left is moved along. A question can name its room, and then opening it opens the door first. *Take your seat* and *Presentation* always bring everyone back to the classroom.
 - **Slides:** ◀ ▶, E for the next reveal step (also the arrow keys and E on the keyboard), Go to, and the speaker notes for the current slide.
 - **Questions:** open, close, *Suggest scores* (AI), adjust any score 0–3 and its feedback, *Reveal to everyone*, then *Show a sound answer* if the lesson has one. Quick questions can be asked on the spot: written, zones, or an opinion line.
 - **The submit gate:** while students are still writing, *Close* reads *Close anyway (3 still writing)*, and anything else that would move the room on (another question, Presentation, Take your seat) asks first. Changing slide is always free. Only you see the names.
@@ -60,11 +63,15 @@ The flags next to answers (short, unmarked parts, mostly pasted, written very fa
 - **choice:** students walk into the zone of their answer (or click, with `"zones": false`). Options can be shuffled, can carry a "because ①②③" reason, and can have a written follow-up. With `"correct": null` it is a poll.
 - **grid:** a row of buttons per line, like the tick boxes on a worksheet. Each row can have its own options and more than one accepted answer.
 - **line:** an opinion line. Students stand anywhere between two ends ("Disagree" … "Agree"); the result is the spread across the room. Never right or wrong.
+- **bug:** spot the bug. Students click the faulty line of a piece of code; you see who found it and how fast.
+- **code:** the code bench. Students write JavaScript and run it against the lesson's checks. The code runs only in their own browser; you see the code next to the ticks.
 - **text:** a written answer. If the question names parts, students mark them in their text with buttons that write `==①…==`; correctly marked parts raise the multiplier.
+
+Any question can be **pair work** (`"pairs": true`): students are put in twos and seated side by side, one hand-in counts for both, and it is scored once.
 
 ## Scoring, for fun
 
-Chips × multiplier, counted up on screen. Handing in is worth 10; a right choice 30 (half right 15); a right reason 15; 10 per right grid row; the AI or teacher score is worth 15 per point (0–3). Each correctly marked part adds ×0.5.
+Chips × multiplier, counted up on screen. Handing in is worth 10; a right choice or the right line of a bug 30 (half right 15); a right reason 15; 10 per right grid row or passing check; the AI or teacher score is worth 15 per point (0–3). Each correctly marked part adds ×0.5.
 
 Two bonuses reward showing up rather than being right: handing in several questions in a row (+5 for each one in the run, up to +25), and +10 for everyone when the whole room hands in before you close. Missing a question costs nothing.
 
@@ -74,6 +81,7 @@ AI scoring sends the question, the rubric and the answers (as a1, a2…, no name
 
 ## The fun parts
 
+- **Walking:** arrow keys or WASD, or tap/click the floor and your avatar finds its way there. Furniture is solid: you walk around desks, and you can stand behind or in front of them.
 - **Reactions:** six bubbles over your avatar (keys 1–6 or the top bar), and Space to hop. *I'm lost* also tells the teacher, quietly; *Got it* clears it.
 - **Hats:** your own points unlock hats; improving an answer on a retry unlocks the scholar cap.
 - **Class goal:** everyone's points fill one bar. Each level adds something to the room for all: fairy lights, a cat, an arcade machine and a ball to kick around in breaks, a disco ball at results time, a golden trophy.
@@ -113,8 +121,10 @@ The game reads the lesson from the deck itself:
 
    `after` is the question whose reveal earns it (leave it out to award it by hand). Sprites: cup, star, tape, bug, key, book, flask, bulb, flag, gear.
 
+   A question can also say where it happens and how: `"room": "floor"` (open floor, good for zones and opinion lines) or `"lab"` (the workshop, with tables for two), and `"pairs": true`. A slide can set the room for all its questions with `data-game-room="lab"`.
+
 2. Tie each question to its slide: `<section class="slide" data-game-question="g" …>` (several keys separated by spaces).
-3. Load `scripts/game-bridge.js` so the game can press E on the slide and jump between slides instantly.
+3. Load `scripts/game-bridge.js` so the game can press E on the slide and jump between slides instantly. It also lets a slide talk to the game on the projector: `classGame.open('g')`, `classGame.timer(120)`, `classGame.trophy('m')`, `classGame.room('lab')`, for example from a button on the slide.
 
 The slide list (numbers, titles, task and break slides) comes from the deck's own `data-mode`, `data-seg` and headings. See `example/lectures/week-08/week-08-slides.html` for the full Week 8 set: 19 questions on 14 slides.
 
@@ -126,7 +136,7 @@ To run another deck: `node server.js --lesson <teacher deck url> --deck <student
 
 - `server.js`: HTTP server, live updates (server-sent events), the list of student and teacher actions.
 - `lib/`: the room and its rules (`game.js`), points (`scoring.js`), what each role sees (`views.js`), the questions board (`asks.js`), what carries over between lessons (`term.js`), the report (`report.js`), the lesson reader (`manifest.js`), quick checks (`checks.js`), AI scoring (`ai.js`).
-- `public/`: the three pages (student, teacher, projector), the room and avatar drawing, styles.
+- `public/`: the three pages (student, teacher, projector), the room and avatar drawing, styles. The rooms are data: `js/rooms.js` (what stands where), `js/things.js` (furniture and its solid boxes), `js/path.js` (finding a way around it).
 - `public/assets/`: the office tileset and the 8 avatar sheets, from The Agency (CC0 1.0, see `public/assets/LICENSE.md`).
 - `tools/cut-sprites.js`: shrinks an AI-drawn sprite sheet to crisp game-size sprites. `tools/report.js`: the session report.
 - `example/lectures/`: the Week 8 deck, made game-ready.
@@ -134,4 +144,4 @@ To run another deck: `node server.js --lesson <teacher deck url> --deck <student
 
 ## Not built
 
-Adventure rooms and doors, pair tables, spot the bug, the code bench, the rich text and code editors, an AI check on the questions board, and sign-in with school accounts. They are in the design, for later.
+The rich text and code editors (ProseMirror, CodeMirror: the answer boxes are plain text boxes), optional side rooms for early finishers, an AI check on the questions board, and sign-in with school accounts.

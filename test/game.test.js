@@ -7,7 +7,9 @@ import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { start } from '../server.js';
-import { zones, optionOrder, BALL_HOME, HOT_SEAT, FLOOR } from '../public/js/world.js';
+import { zones, optionOrder, FLOOR } from '../public/js/world.js';
+import { ROOMS, HOT_SEAT, DOOR, canStand, thingsIn } from '../public/js/rooms.js';
+import { findPath } from '../public/js/path.js';
 import { Game } from '../lib/game.js';
 import { loadLesson } from '../lib/manifest.js';
 import { loadTerm } from '../lib/term.js';
@@ -39,8 +41,9 @@ const untilScored = async () => {
 function spotFor(q, option) {
   const order = optionOrder(q);
   const z = zones(order.length)[order.indexOf(option)];
-  return { x: z.x + z.w / 2 - 0.5, y: z.y + 2 };
+  return { x: z.x + z.w / 2 - 0.5, y: 9 }; // row 9 is a row of chairs: nothing solid there
 }
+const BALL_HOME = ROOMS.base.ballHome;
 
 const students = [];
 before(async () => {
@@ -337,7 +340,7 @@ test('the submit gate holds the room until everyone handed in, unless the teache
 
 test('spotlight walks the student to the hot seat and back; pick chooses someone who answered', async () => {
   const cy = game.players.get(students[2].id);
-  await post('/api/move', { token: students[2].token, x: 20, y: 12, dir: 'left', moving: false });
+  await post('/api/move', { token: students[2].token, x: 20, y: 13, dir: 'left', moving: false });
   const warp = cy.warp;
   await teacher('spotlight', { pid: cy.id });
   assert.deepEqual([cy.x, cy.y], [HOT_SEAT.x, HOT_SEAT.y]);
@@ -346,7 +349,7 @@ test('spotlight walks the student to the hot seat and back; pick chooses someone
   assert.equal(cy.x, HOT_SEAT.x, 'a move sent before the browser saw the walk-up is ignored');
   assert.equal(game.screenView().spotlight.choice, 'No', 'the projector shows the words, not an option number');
   await teacher('spotlight', { pid: null });
-  assert.deepEqual([cy.x, cy.y], [20, 12], 'back where they stood');
+  assert.deepEqual([cy.x, cy.y], [20, 13], 'back where they stood');
   await teacher('pick');
   assert.ok(game.records.gate.answers[game.spotlight.pid]);
   await teacher('spotlight', { pid: null });
@@ -463,4 +466,117 @@ test('the session report gives hand-in rates without names unless asked', async 
   const r = await fetch(`${base}/report?key=${srv.key}`);
   assert.equal(r.status, 200);
   assert.equal((await fetch(`${base}/report?key=nope`)).status, 403);
+});
+
+// ---- rooms: furniture, doors, adventures ------------------------------------------------------
+
+test('furniture is solid, every seat can be reached, and the server refuses a spot inside a desk', async () => {
+  for (const room of Object.keys(ROOMS)) {
+    assert.ok(canStand(room, DOOR.x, DOOR.y) && canStand(room, HOT_SEAT.x, HOT_SEAT.y), `${room}: the door and the hot seat are free`);
+    for (const seat of ROOMS[room].seats) assert.ok(findPath(room, DOOR, seat).length > 0, `${room}: a way from the door to the seat at ${seat.x},${seat.y}`);
+    for (const thing of thingsIn(room, ['games', 'trophy'])) assert.ok(thing.def.flat || thing.solid, `${room}: ${thing.kind} has a solid box`);
+  }
+  for (const [x, y] of ROOMS.base.catSpots) assert.ok(canStand('base', x, y, ['games', 'trophy']), `the cat can stand at ${x},${y}`);
+  assert.equal(canStand('base', 4, 8), false, 'feet inside a desk');
+  assert.ok([...game.players.values()].every((p) => canStand(game.room, p.x, p.y)), 'nobody joined inside a desk');
+  assert.equal(canStand('base', 4, 9), true, 'on its chair');
+
+  await teacher('mode', { mode: 'free' });
+  const ada = game.players.get(students[0].id);
+  await post('/api/move', { token: students[0].token, x: 4, y: 9 });
+  assert.equal((await post('/api/move', { token: students[0].token, x: 4, y: 8 })).ok, false);
+  assert.deepEqual([ada.x, ada.y], [4, 9], 'the player stays where they were');
+  assert.equal((await post('/api/move', { token: students[0].token, x: 99, y: 99 })).ok, false, 'and off the floor is refused too');
+});
+
+test('a question in another room opens the door; the class walks through together', async () => {
+  for (const s of students) game.setOnline(game.players.get(s.id), +1);
+  await teacher('open', { def: { key: 'adventure', kind: 'bug', title: 'Bug hunt', prompt: 'Which line?', code: 'let a = 1;\nlet b = a + ;\nreturn b;', correct: 2, room: 'lab' } });
+  assert.equal(game.room, 'base');
+  assert.equal(game.screenView().door.name, 'Workshop');
+  assert.equal(game.live?.key === 'adventure', false, 'the question waits for the class to arrive');
+
+  // Ada walks through and waits on the other side; the others follow.
+  await post('/api/move', { token: students[0].token, ...DOOR });
+  assert.equal(game.screenView().players.find((p) => p.id === students[0].id).gone, true);
+  assert.equal((await post('/api/move', { token: students[0].token, x: 10, y: 9 })).ok, false, 'no walking about once through');
+  assert.equal(game.room, 'base');
+  for (const s of students.slice(1)) await post('/api/move', { token: s.token, ...DOOR });
+  assert.equal(game.room, 'lab', 'the last one through: nobody waits for the countdown');
+  assert.equal(game.door, null);
+  assert.equal(game.live.key, 'adventure');
+  const spots = students.map((s) => game.players.get(s.id)).map((p) => `${p.x},${p.y}`);
+  assert.equal(new Set(spots).size, 4, 'everyone lands on their own spot');
+  assert.ok(students.every((s) => !game.players.get(s.id).gone && canStand('lab', game.players.get(s.id).x, game.players.get(s.id).y)));
+
+  // Spot the bug: marked by rule, with how long each student took for the teacher.
+  await post('/api/answer', { token: students[0].token, line: 2 });
+  await post('/api/answer', { token: students[1].token, line: 3 });
+  await assert.rejects(post('/api/answer', { token: students[2].token, line: 9 }), /line/);
+  await teacher('reveal', { force: true });
+  const rec = game.records.adventure;
+  assert.equal(rec.answers[students[0].id].attempts[0].auto.choice, 'right');
+  assert.equal(rec.answers[students[0].id].attempts[0].points - rec.answers[students[1].id].attempts[0].points, 30);
+  assert.deepEqual(game.screenView().question.lineCounts, [0, 1, 1]);
+  assert.ok(game.teacherView().answers[0].took >= 0);
+
+  // "Take your seat" from another room is the walk back; when it ends everyone is seated in the classroom.
+  await teacher('seat', { seconds: 0.05 });
+  assert.equal(game.door.to, 'base');
+  await wait(150);
+  assert.equal(game.room, 'base');
+  assert.equal(game.mode, 'present');
+  assert.ok(students.every((s) => game.players.get(s.id).seat >= 0));
+  await teacher('mode', { mode: 'free' });
+});
+
+test('the code bench trusts the browser for the checks but shows the teacher the code', async () => {
+  const tests = [{ name: 'adds', check: 'add(1, 2) === 3' }, { name: 'adds negatives', check: 'add(-1, -1) === -2' }];
+  await teacher('open', { def: { key: 'bench', kind: 'code', title: 'Bench', prompt: 'Write add', starter: 'function add(a, b) {}', tests } });
+  assert.deepEqual(game.studentView(game.players.get(students[0].id)).question.tests, tests);
+  await post('/api/answer', { token: students[0].token, text: 'function add(a, b) { return a + b; }', passed: [true, true] });
+  await post('/api/answer', { token: students[1].token, text: 'function add(a, b) { return 3; }', passed: [true, false, true, 'yes'] });
+  await teacher('reveal', { force: true });
+  const [ada, bo] = [students[0], students[1]].map((s) => game.records.bench.answers[s.id].attempts[0]);
+  assert.deepEqual(bo.auto.tests, [true, false], 'only real ticks, and only as many as there are checks');
+  assert.ok(ada.breakdown.steps.some((s) => s.label === '2/2 checks pass' && s.chips === 20));
+  assert.equal(game.teacherView().answers.find((a) => a.pid === students[1].id).text, 'function add(a, b) { return 3; }');
+  assert.deepEqual(game.screenView().question.passCounts, [2, 1]);
+});
+
+test('pair work: one hand-in counts for both, is scored once, and each keeps their own points', async () => {
+  await teacher('open', { def: { key: 'duo', kind: 'text', pairs: true, title: 'Duo', prompt: 'Explain it together', rubric: ['explains the queue clearly'] } });
+  const rec = game.records.duo;
+  assert.deepEqual(rec.groups.map((g) => g.length), [2, 2]);
+  const [first, mate] = rec.groups[0].map((id) => game.players.get(id));
+  const token = students.find((s) => s.id === first.id).token;
+  assert.deepEqual(game.studentView(mate).me.partners.map((p) => p.name), [first.name]);
+  assert.equal(first.seat >= 0 && Math.abs(first.seat - mate.seat) === 1, true, 'the pair sits side by side');
+
+  const text = 'The queue keeps requests in order, which explains clearly why the second click waits for the first one to finish.';
+  await post('/api/answer', { token, text, meta: { activeMs: 60000 } });
+  assert.equal(game.studentView(mate).mine.text, text);
+  assert.equal(game.studentView(mate).mine.by, first.name);
+  assert.equal(game.stillWriting().length, 2, 'only the other pair is still writing');
+  assert.equal(game.teacherView().answers.length, 1, 'the teacher sees one answer for the pair');
+  assert.equal(game.teacherView().answers[0].name, `${first.name} + ${mate.name}`);
+
+  await teacher('score', { force: true });
+  await untilScored();
+  await teacher('reveal');
+  const [a, b] = [first, mate].map((p) => rec.answers[p.id].attempts[0]);
+  assert.equal(a.ai.score, b.ai.score);
+  assert.ok(a.points > 0 && b.points > 0);
+  assert.equal(game.screenView().question.wall.length, 1);
+  assert.deepEqual(game.screenView().question.wall[0].ids.sort(), [first.id, mate.id].sort());
+  for (const s of students) game.setOnline(game.players.get(s.id), -1);
+  await teacher('mode', { mode: 'free' });
+});
+
+test('the demo lesson loads with every kind of question, rooms and trophies', async () => {
+  const demo = await loadLesson(join(ROOT, 'example/demo-lesson.json'));
+  assert.deepEqual([...new Set(demo.order.map((k) => demo.questions[k].kind))].sort(), ['bug', 'choice', 'code', 'grid', 'line', 'text']);
+  assert.ok(demo.order.every((k) => !demo.questions[k].room || ROOMS[demo.questions[k].room]));
+  assert.equal(demo.questions.pair.pairs, true);
+  assert.equal(demo.trophies.length, 2);
 });

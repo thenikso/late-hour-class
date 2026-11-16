@@ -1,0 +1,86 @@
+{
+  "title": "Demo · every kind of question",
+  "questions": {
+    "warmup": {
+      "kind": "line",
+      "title": "Warm-up · where do you stand?",
+      "prompt": "I have written code before today.",
+      "labels": ["Never", "A lot"],
+      "room": "floor"
+    },
+    "zones": {
+      "kind": "choice",
+      "title": "Zones · which one can you test?",
+      "prompt": "Which requirement could you check with a stopwatch? Walk to it.",
+      "options": ["The page should feel fast", "The page opens within 2 seconds", "Users should like the page"],
+      "correct": 1,
+      "reasons": { "options": ["it names a number", "it is the shortest", "it sounds strict"], "correct": 0 },
+      "room": "floor"
+    },
+    "grid": {
+      "kind": "grid",
+      "title": "Grid · fact or opinion?",
+      "prompt": "Tick one for each line.",
+      "options": ["Fact", "Opinion"],
+      "rows": [
+        { "text": "The test failed three times today", "correct": 0 },
+        { "text": "This code is ugly", "correct": 1 },
+        { "text": "The loop runs n - 1 times", "correct": 0 }
+      ]
+    },
+    "bug": {
+      "kind": "bug",
+      "title": "Spot the bug · sumTo",
+      "prompt": "sumTo(4) should give 1 + 2 + 3 + 4 = 10, but it gives 6. Click the line with the bug.",
+      "code": "function sumTo(n) {\n  let total = 0;\n  for (let i = 1; i < n; i++) {\n    total += i;\n  }\n  return total;\n}",
+      "correct": 3,
+      "room": "lab"
+    },
+    "code": {
+      "kind": "code",
+      "title": "Code bench · isEven",
+      "prompt": "Write isEven(n): true when n is even, false when it is odd.",
+      "starter": "function isEven(n) {\n  // your code here\n}\n",
+      "tests": [
+        { "name": "isEven(4) is true", "check": "isEven(4) === true" },
+        { "name": "isEven(7) is false", "check": "isEven(7) === false" },
+        { "name": "isEven(0) is true", "check": "isEven(0) === true" }
+      ],
+      "room": "lab"
+    },
+    "pair": {
+      "kind": "text",
+      "pairs": true,
+      "title": "In pairs · explain the bug",
+      "prompt": "With your partner: why does `i < n` give the wrong sum, and how would you fix it?",
+      "parts": ["what goes wrong", "the fix"],
+      "rubric": ["Says the loop stops before the last number", "Gives a fix that includes n (i <= n, or n + 1)"],
+      "example": "The loop stops when i reaches n, so n itself is never added. Changing the test to i <= n includes it.",
+      "room": "lab"
+    },
+    "poll": {
+      "kind": "choice",
+      "title": "Poll · how was that?",
+      "prompt": "How did this lesson go for you?",
+      "options": ["Too easy", "About right", "Too hard"],
+      "correct": null,
+      "scored": false,
+      "room": "base"
+    }
+  },
+  "trophies": [
+    {
+      "after": "bug",
+      "name": "Off by one",
+      "sprite": "bug",
+      "text": "A loop that stops one step early or late is one of the most common bugs. Check its first and its last round.",
+      "example": "i < n stops before n; i <= n includes it."
+    },
+    {
+      "after": "code",
+      "name": "It runs",
+      "sprite": "gear",
+      "text": "A check is a small question your code must answer correctly. Write the check first, then the code."
+    }
+  ]
+}

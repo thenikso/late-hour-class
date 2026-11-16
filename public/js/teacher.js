@@ -127,12 +127,26 @@ function render() {
   // Students who pressed "I'm lost" on this slide (they clear it with "Got it").
   $('#lost').hidden = !s.lost.length;
   $('#lost').textContent = s.lost.length ? `? ${s.lost.length} lost: ${s.lost.join(', ')}` : '';
+  renderRooms();
   renderSlides();
   renderQuestion();
   renderPlayers();
   renderBoard();
   renderAsks();
   renderGoal();
+}
+
+/** One button per room. Pressing one opens the door: the class has a few seconds to walk through. */
+function renderRooms() {
+  const s = state;
+  const box = $('#rooms');
+  box.innerHTML = '';
+  box.append(h('strong', {}, 'Door to'));
+  for (const r of s.rooms) {
+    const here = r.id === s.room;
+    const opening = s.door?.to === r.id;
+    box.append(h('button', { class: `btn small ${here ? 'on' : ''}`, disabled: here, onclick: () => act('room', { room: r.id }) }, opening ? `${r.name} (door open…)` : r.name));
+  }
 }
 
 // ---- the slide list ------------------------------------------------------------------------
@@ -359,6 +373,15 @@ function statsView(q) {
       const right = q.rowCorrect[i] || [];
       box.append(h('div', {}, `${i + 1}. ${row.text.slice(0, 60)} → `, (row.options || q.options).map((o, j) => h('span', { class: right.includes(j) ? 'ok' : '' }, `${o}: ${q.rowStats[i][j]}  `))));
     });
+  if (q.kind === 'bug')
+    box.append(
+      h(
+        'ol',
+        { class: 'code-lines' },
+        q.code.split('\n').map((line, i) => h('li', { class: q.correctLines.includes(i + 1) ? 'right' : '' }, h('code', {}, line || ' '), q.lineCounts[i] ? h('b', {}, ` ← ${q.lineCounts[i]}`) : '')),
+      ),
+    );
+  if (q.kind === 'code') q.tests.forEach((test, i) => box.append(h('div', {}, `${test.name} · ${q.passCounts[i]} pass`, bar(q.passCounts[i], q.submitted))));
   if (q.kind === 'line') {
     const total = q.spread.reduce((x, y) => x + y, 0);
     box.append(h('div', {}, `${q.labels[0]} ◀ `, q.spread.map((n) => h('span', {}, bar(n, total), ` ${n} `)), `▶ ${q.labels[1]}`, isSet(q.average) ? ` · average ${q.average}/100` : ''));
@@ -406,7 +429,11 @@ function answerItem(q, a, picks) {
       ),
     );
   if (def.kind === 'line' && isSet(a.value)) body.append(h('div', {}, `Stands at ${a.value}/100`));
-  if (a.text) body.append(h('div', { html: marksToHtml(a.text) }));
+  if (def.kind === 'bug') body.append(h('div', {}, `Line ${a.line}`, tick({ right: true, wrong: false }[a.auto?.choice]), h('span', { class: 'quiet' }, ` · after ${clock(a.took)}`)));
+  if (def.kind === 'code') {
+    // The checks ran in the student's browser: read the code before trusting the ticks.
+    body.append(h('pre', { class: 'code' }, a.text), h('div', {}, def.tests.map((test, i) => h('span', { class: a.passed?.[i] ? 'ok' : 'no' }, `${a.passed?.[i] ? '✓' : '✗'} ${test.name}  `))));
+  } else if (a.text) body.append(h('div', { html: marksToHtml(a.text) }));
   li.append(body);
   if (a.flags.length) li.append(h('div', {}, a.flags.map((f) => h('span', { class: `chip ${f.level}` }, f.label))));
 

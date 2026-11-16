@@ -1,7 +1,7 @@
 // The projector view: the room, the shared screen, and the big moments
 // (countdowns, the hand-in counter, results and the spotlight).
 
-import { $, h, connect, screenFrame, placeFrame, sound, countTo, bump, celebrate, clock, classBar } from './common.js';
+import { $, h, post, connect, screenFrame, placeFrame, sound, countTo, bump, celebrate, clock, classBar } from './common.js';
 import { Room, ROOM_SIZE } from './room.js';
 import { avatarCanvas } from './sprites.js';
 import { LETTERS } from './world.js';
@@ -51,6 +51,23 @@ connect(
   },
 );
 
+// A game-ready deck on the screen can ask the game for a few things itself, for
+// example a button on a slide that opens its question (see game-bridge.js in the
+// example). Only the deck inside this page's own screen is listened to, and only
+// for the actions listed here.
+const DECK_COMMANDS = {
+  open: (m) => ({ key: String(m.key) }),
+  trophy: (m) => ({ id: String(m.id) }),
+  timer: (m) => ({ seconds: Number(m.seconds) }),
+  room: (m) => ({ room: String(m.room) }),
+};
+addEventListener('message', (e) => {
+  const message = e.data;
+  if (e.source !== $('#screen').contentWindow || message?.type !== 'cge:command' || !state?.screen.slide) return;
+  const body = DECK_COMMANDS[message.action]?.(message);
+  if (body) post(`/api/teacher/${message.action}?key=${encodeURIComponent(key)}`, body).catch(() => {});
+});
+
 /** The class earned something (a room reward, a trophy): say it big, for a few seconds. */
 let newsTimer = null;
 function bigNews(title, text, confetti) {
@@ -99,10 +116,8 @@ function render() {
   $('#join').hidden = s.mode === 'present' || full || asking;
 
   const banner = $('#banner');
-  if (s.mode === 'seating') {
-    banner.hidden = false;
-    tick();
-  } else banner.hidden = true;
+  banner.hidden = !(s.door || s.mode === 'seating');
+  if (!banner.hidden) tick();
 
   const k = $('#klass');
   k.hidden = s.mode === 'present' || s.mode === 'review' || full || !!s.finale;
@@ -174,9 +189,12 @@ function renderFinale() {
 let timer = null;
 function tick() {
   clearTimeout(timer);
-  if (!state || state.mode !== 'seating') return;
-  const left = Math.max(0, Math.ceil((state.seatingEndsAt - state.serverNow - (performance.now() - renderedAt)) / 1000));
-  $('#banner').innerHTML = `Take your seat! <span class="countdown">${left}</span>`;
+  const endsAt = state?.door ? state.door.endsAt : state?.mode === 'seating' ? state.seatingEndsAt : null;
+  if (!endsAt) return;
+  const left = Math.max(0, Math.ceil((endsAt - state.serverNow - (performance.now() - renderedAt)) / 1000));
+  const banner = $('#banner');
+  banner.innerHTML = '';
+  banner.append(state.door ? `The door is open: off to the ${state.door.name.toLowerCase()}! ` : 'Take your seat! ', h('span', { class: 'countdown' }, left));
   if (left <= 3 && left > 0) sound.blip(left * 2);
   timer = setTimeout(tick, 1000);
 }
@@ -261,6 +279,15 @@ function renderWall() {
       );
     });
 
+  if (q.kind === 'bug')
+    wall.append(
+      h(
+        'ol',
+        { class: 'code-lines' },
+        q.code.split('\n').map((line, i) => h('li', { class: q.correctLines.includes(i + 1) ? 'right' : '' }, h('code', {}, line || ' '), q.lineCounts[i] ? h('b', {}, `  ← ${q.lineCounts[i]}`) : '')),
+      ),
+    );
+  if (q.kind === 'code') q.tests.forEach((test, i) => wall.append(h('div', { class: 'stat right' }, h('span', { class: 'bar', style: `width:${(q.passCounts[i] / Math.max(1, q.submitted)) * 200}px` }), `${q.passCounts[i]} pass · ${test.name}`)));
   if (q.kind === 'line') {
     const most = Math.max(1, ...q.spread);
     wall.append(
@@ -273,14 +300,14 @@ function renderWall() {
   const hasText = (q.wall || []).some((w) => w.text);
   let i = 0;
   for (const w of q.wall || []) {
-    if (q.kind === 'line') break; // the avatars on the floor are the result
+    if (q.kind === 'line' || q.kind === 'bug') break; // the floor, or the code above, is the result
     if (!hasText && i >= 8) break;
     const pts = h('span', { class: 'points' }, '0');
     const card = h(
       'div',
       { class: 'card' },
       h('div', { class: 'who' }, avatarCanvas(w.avatar, 1.5), h('span', { class: 'grow' }, w.name), w.improved ? h('span', { class: 'improved-badge' }, 'IMPROVED') : '', pts),
-      w.text ? h('div', { html: marksToHtml(w.text) }) : '',
+      w.text ? (q.kind === 'code' ? h('pre', { class: 'code' }, w.text) : h('div', { html: marksToHtml(w.text) })) : '',
     );
     wall.append(card);
     setTimeout(() => countTo(pts, 0, w.points, 600).then(() => (bump(pts), sound.blip(5 + (i % 7)))), 200 + i * 180);
@@ -311,7 +338,7 @@ function renderSpot() {
     h('div', { class: 'q' }, sp.question),
     h('h2', {}, h('span', {}, avatarCanvas(sp.avatar, 2)), ` ${sp.name}`),
     sp.choice ? h('div', { class: 'q' }, `Chose: ${sp.choice}`) : '',
-    sp.text ? h('div', { html: marksToHtml(sp.text) }) : '',
+    sp.text ? (sp.code ? h('pre', { class: 'code' }, sp.text) : h('div', { html: marksToHtml(sp.text) })) : '',
   );
 }
 

@@ -83,3 +83,10 @@ details summary { cursor: pointer; color: var(--quiet); }
 .asks li { background: var(--bg2); border-radius: 4px; padding: 6px; overflow-wrap: anywhere; }
 .asks li.held { outline: 1px dashed var(--warn); }
 select { width: auto; }
+
+/* code questions */
+.code-lines { margin: 6px 0; padding-left: 34px; background: #120d22; border-radius: 4px; }
+.code-lines li { padding: 1px 6px; color: var(--quiet); }
+.code-lines code, pre.code { color: var(--ink); white-space: pre-wrap; font-family: inherit; }
+.code-lines li.right { background: #1d4a30; }
+pre.code { background: #120d22; border-radius: 4px; padding: 6px 8px; margin: 4px 0; font-size: 13px; }

@@ -23,10 +23,15 @@ export const tileset = loaded('/assets/tiles/office.png');
 //   emotes.png  6 icons, 12 px cells, in EMOTES order
 //   cat.png     sit, stand, walk, sleep (16 px cells, facing right)
 //   props.png   arcade machine, disco ball, trophy, ball (16 × 32 cells, standing on the bottom edge)
+//   trophies.png  10 concept trophies, 16 px cells, in TROPHY_SPRITES order
 const hatSheet = loaded('/assets/fun/hats.png');
 const emoteSheet = loaded('/assets/fun/emotes.png');
 const catSheet = loaded('/assets/fun/cat.png');
 const propSheet = loaded('/assets/fun/props.png');
+const trophySheet = loaded('/assets/fun/trophies.png');
+/** The sprites a lesson can name for its trophies. An unknown name shows the cup. */
+export const TROPHY_SPRITES = ['cup', 'star', 'tape', 'bug', 'key', 'book', 'flask', 'bulb', 'flag', 'gear'];
+export const TROPHY_SIZE = 16;
 const HAT_IDS = ['cap', 'beanie', 'party', 'headphones', 'grad', 'pirate', 'wizard', 'crown'];
 // How many pixels each hat sinks onto the head (headphones go around it).
 const HAT_SINK = { cap: 5, beanie: 5, party: 3, headphones: 7, grad: 4, pirate: 5, wizard: 4, crown: 3 };
@@ -132,6 +137,24 @@ export function drawProp(g, name, x, y) {
 export function drawBall(g, x, y) {
   if (!propSheet.complete || !propSheet.naturalWidth) return;
   g.drawImage(propSheet, PROPS.ball * 16, 16, 16, 16, Math.round(x - 5), Math.round(y - 10), 10, 10);
+}
+
+/** One concept trophy (16 px) with its top-left corner at (x, y). */
+export function drawTrophy(g, sprite, x, y, size = TROPHY_SIZE) {
+  if (!trophySheet.complete || !trophySheet.naturalWidth) return;
+  const i = Math.max(0, TROPHY_SPRITES.indexOf(sprite));
+  g.drawImage(trophySheet, i * TROPHY_SIZE, 0, TROPHY_SIZE, TROPHY_SIZE, Math.round(x), Math.round(y), size, size);
+}
+
+/** A small canvas showing one trophy, for lists and cards. */
+export function trophyCanvas(sprite, scale = 3) {
+  const c = document.createElement('canvas');
+  c.width = c.height = TROPHY_SIZE * scale;
+  c.className = 'icon';
+  const g = c.getContext('2d');
+  g.imageSmoothingEnabled = false;
+  whenReady(trophySheet, () => drawTrophy(g, sprite, 0, 0, TROPHY_SIZE * scale));
+  return c;
 }
 
 /** A small canvas showing one hat or emote, for buttons. */

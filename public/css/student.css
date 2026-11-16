@@ -108,3 +108,18 @@
 .trophy p { margin: 4px 0 0; }
 .trophy a { color: var(--chips); }
 .hint { position: fixed; left: 50%; bottom: 14px; transform: translateX(-50%); z-index: 26; cursor: pointer; color: var(--gold); font: inherit; }
+
+/* ---- code questions and pair work -------------------------------------------------- */
+.pair { color: var(--good); font-size: 13px; margin: 0 0 6px; }
+.code-lines { margin: 6px 0; padding-left: 34px; background: #120d22; border-radius: 4px; font-size: 13px; }
+.code-lines li { padding: 1px 6px; border-left: 2px solid #45367a; color: var(--quiet); }
+.code-lines code { color: var(--ink); white-space: pre-wrap; font-family: inherit; }
+.code-lines.pickable li { cursor: pointer; }
+.code-lines.pickable li:hover { background: #3b2e6b; }
+.code-lines li.picked { background: #4a3f12; border-left-color: var(--gold); }
+.code-lines li.right { background: #1d4a30; border-left-color: var(--good); }
+.code-lines li.wrong { background: #4a1f2c; border-left-color: var(--bad); }
+textarea.code { min-height: 200px; white-space: pre; overflow: auto; tab-size: 2; font-size: 13px; }
+.checks { list-style: none; padding: 0; margin: 6px 0; font-size: 13px; }
+.no { color: var(--bad); }
+#room { touch-action: none; cursor: pointer; }

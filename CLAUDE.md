@@ -13,7 +13,8 @@ Nicola Peduzzi teaches Software Engineering at H-Farm and is the only user and d
 ```sh
 npm run example:mock   # Week 8 example with fake offline scoring (no AI)
 npm run example        # same, scoring with the local `claude` CLI
-npm test               # node:test, simulated students through the main flows (23 tests)
+npm run demo           # every question kind, the three rooms and trophies, from example/demo-lesson.json (mock AI)
+npm test               # node:test, simulated students through the main flows (28 tests)
 npm run report         # Markdown report of the newest session in data/ (add a file, or --names)
 npm start -- --lesson <deck url> --deck <student deck url> --projector <deck url> --notes "<deck url>?view=notes"
 node tools/serve-slides.js <lectures folder>   # student copy on :3001 (LAN), full copy on :3002 (localhost)
@@ -23,13 +24,13 @@ node tools/serve-slides.js <lectures folder>   # student copy on :3001 (LAN), fu
 
 The Monocraft font is committed in `public/fonts/`; there is no download step.
 
-`.claude/launch.json` runs the mock example with `--data data/preview`, so browser checks never touch the real `data/term.json`.
+`.claude/launch.json` has two previews, `example-mock` and `demo` (teacher key `demo`); both use `--data data/preview`, so browser checks never touch the real `data/term.json`.
 
 ## Hard rules
 
 - **Zero dependencies, no build step.** Node 20+ built-ins only on the server; plain ES modules, HTML and CSS in the browser. Students may read every file one day, so keep the code plain and commented where it isn't obvious. If an editor (ProseMirror, CodeMirror) arrives later, it comes as one pre-bundled vendored file; the game's own code stays unbundled.
 - **The engine is course-neutral.** No Software Engineering or H-Farm logic in `server.js`, `lib/` or `public/`. Course content arrives only through a lesson manifest (in a deck or a JSON file) and a deck URL. The Week 8 deck in `example/` is just an example.
-- **The server is the only source of truth.** Clients send intentions (move, answer); the server validates, decides and broadcasts. Zone answers use the player's position on the server, not what the client claims.
+- **The server is the only source of truth.** Clients send intentions (move, answer); the server validates, decides and broadcasts. Zone answers use the player's position on the server, not what the client claims. The one exception is the code bench: student code runs only in that student's browser (a Web Worker), which reports which checks passed; the teacher sees the code beside the result. Never run student code on the server.
 - **Student text is never rendered as HTML.** Use `textContent`, the `h()` helper in `public/js/common.js`, or `marksToHtml()` (which escapes first). Keep it that way everywhere, including the projector.
 - **Scores are for fun.** They never feed a grade. Retries are never penalised: the best attempt counts, and a better retry earns the IMPROVED badge. Leaderboards show only the top 5 plus "Improved today".
 - **Fun never costs points, and never shames.** Streaks and the team bonus reward handing in, not being right or fast; missing one costs nothing. Hats, the class goal and the finale are cosmetic. Nothing shows the class who has *not* handed in or who is lost (only the teacher sees that). Effects stay off the slides: no hops, cat or disco during a presentation.
@@ -41,7 +42,7 @@ The Monocraft font is committed in `public/fonts/`; there is no download step.
 ## How it fits together
 
 - `server.js`: `node:http` server. `GET /events` is a server-sent events stream per client (`state`, `pos`, `fx`, `ball`, `kicked`). Actions are two tables: `STUDENT_ACTIONS` (`POST /api/<action>` with a token) and `TEACHER_ACTIONS` (`POST /api/teacher/<action>?key=…`). `GET /report?key=…` is the session report. Also serves `public/`. `start(opts)` is exported for tests.
-- `lib/game.js`: the `Game` class: players, room modes (`free`, `seating`, `present`, `question`, `review`), the shared screen (slide number and cue count), the question life cycle (open, submit, close, score, reveal, retry), the submit gate (`checkGate`, `GateError`), spotlight and hot seat, trophies, totals and the session JSON (`save`/`restore`, `--resume`).
+- `lib/game.js`: the `Game` class: players, rooms and the shared door (`openDoor`, `goThrough`, `arrive`, `enter`), pair work (`makePairs`, `groupOf`), room modes (`free`, `seating`, `present`, `question`, `review`), the shared screen (slide number and cue count), the question life cycle (open, submit, close, score, reveal, retry), the submit gate (`checkGate`, `GateError`), spotlight and hot seat, trophies, totals and the session JSON (`save`/`restore`, `--resume`).
 - `lib/scoring.js`: pure functions: `needsAi`, `autoScore`, `canRetry`, `breakdown` and the `POINTS` table.
 - `lib/views.js`: `studentView`, `teacherView`, `screenView`. `baseView` is what everyone gets; anything private is added in `teacherView` or under `me` / `mine`.
 - `lib/asks.js`: the questions board (`AskBoard`): a plain rule decides posted or held; votes; teacher moderation.
@@ -50,14 +51,18 @@ The Monocraft font is committed in `public/fonts/`; there is no download step.
 - `lib/manifest.js`: reads a lesson from a deck URL/file or a JSON file; `normaliseQuestion()` is the manifest schema in code.
 - `lib/checks.js`: fast rule checks. `lib/ai.js`: prompt building and the `claude` / `codex` / `mock` / `off` scorers.
 - `public/js/fun.js`: the fun layer's rules, shared by server and browser: emotes, hats and how they unlock, class goal levels, streak and team bonus sizes.
-- `public/js/world.js`: room geometry shared by server and browser (tiles, screen, floor, seats, zones, option shuffling).
-- `public/js/room.js` draws the room on one canvas (tiles painted once, avatars each frame, labels at screen resolution). `public/js/sprites.js` loads the tileset and avatar sheets.
-- `public/js/trophies.js`: trophy sprites written as text, one letter per pixel.
+- `public/js/world.js`: the shell every room shares, for server and browser: size, screen, floor area, zones, the opinion line, trophy shelf slots, option shuffling.
+- `public/js/rooms.js`: the rooms as data (`base` classroom, `floor` open floor, `lab` workshop) and the walking rules: `thingsIn`, `canStand`, `walk`, `nearestFree`, `arrivalSpots`, seats and pair seats. `public/js/things.js` is the furniture catalogue: tiles and the solid box of each thing.
+- `public/js/path.js`: A* over a half-tile grid (`findPath`), for tap-to-walk and the cat.
+- `public/js/room.js` draws a room on one canvas: the shell painted once, then furniture and avatars together in baseline order (that is what puts one in front of another), then labels at screen resolution. `public/js/sprites.js` loads the tileset, avatar and fun sheets.
+- `public/js/code-bench.js`: the spot-the-bug and code editors, and the Web Worker that runs a student's code.
 - `public/js/student.js` (join, walking, top bar), `student-sheet.js` (the question sheet and result card), `student-panels.js` (hats, Ask, trophies), `teacher.js`, `screen.js`: the three pages. `common.js` has the DOM helper, the SSE connection, the screen iframe and the score count-up.
 - `tools/serve-slides.js`: serves a lectures folder twice. The student copy strips speaker notes (`.sn`) and the answer boxes (`data-cue`) on `data-mode="work"` slides; the teacher copy is the full deck, on localhost only.
 - `example/lectures/`: copies of the course's slide engine and the Week 8 deck, plus `scripts/game-bridge.js`.
 
-When the server moves a player (a seat, the hot seat) it calls `Game.place`, which raises that player's `warp` number. The browser follows when it sees a new number and echoes it with every move; a move carrying an old number is ignored.
+A player's position is the top-left of the tile they fill; their feet (`FEET`, and the small `FOOT_BOX` that collides) are near its bottom. The browser walks with `walk()` (it slides along furniture); the server only checks `canStand()` for each reported position and ignores a move into something solid. Every room must keep the door, the hot seat, the front strip and every seat free: a test checks it.
+
+When the server moves a player (a seat, the hot seat, another room) it calls `Game.place`, which raises that player's `warp` number. The browser follows when it sees a new number and echoes it with every move; a move carrying an old number is ignored.
 
 The shared screen is an iframe that always renders at 1280×720 and is scaled with a CSS transform (`placeFrame()` in `common.js`). Don't resize the iframe itself: the decks are scroll-snap documents and reflowing them lands on the wrong slide. Slides change by setting the iframe URL to `deck#n`; the E cue is a `postMessage({type:'cge:cue'})` that `game-bridge.js` turns into an `e` keypress. The bridge also makes in-game slide jumps instant.
 
@@ -80,18 +85,19 @@ A deck becomes game-ready with a `<script type="application/json" id="game-lesso
 - `text`: `prompt`, `parts` (named parts students mark as `==①…==`), `rubric`, `example`.
 - `choice`: `options`, `correct` (index, list, or `null` for a poll), `partial`, `zones` (default true: answer by standing in a floor zone), `shuffle`, `reasons` (`{options, correct}`), optional `text` follow-up (`{prompt, parts, rubric}`).
 - `grid`: `options`, `rows` (`{text, options?, correct}`; `correct` can be a list).
+- `bug`: `code`, `correct` (line number or list, from 1). `code`: `starter`, `tests` (`[{ name, check }]`, each check a JavaScript expression that must be true).
 - `line`: `labels` (the two ends). Always unscored; the answer is where the student stands (0–100).
-- Any kind: `title`, `context`, `scored: false` for unscored polls.
+- Any kind: `title`, `context`, `scored: false` for unscored polls, `room` (`floor` or `lab`: the door opens first), `pairs: true` (one answer per pair).
 
 Next to `questions`, `trophies`: `[{ after, name, sprite, text, example, slide }]` (see `normaliseTrophy`).
 
-Scoring lives in `lib/scoring.js` (`breakdown()`): handed in 10; a hand-in streak +5 per question in a row (up to +25); +10 each when everyone online handed in before the close; right choice 30, half 15; right reason 15; 10 per right grid row; AI/teacher score ×15 (0–3); +0.5 multiplier per correctly marked part. Retry is offered when the AI names something missed or scores under 2, up to 3 attempts. A question to the teacher that got a vote adds 5 to its author (up to 15).
+Scoring lives in `lib/scoring.js` (`breakdown()`): handed in 10; a hand-in streak +5 per question in a row (up to +25); +10 each when everyone online handed in before the close; right choice (or bug line) 30, half 15; right reason 15; 10 per right grid row or passing check; AI/teacher score ×15 (0–3); +0.5 multiplier per correctly marked part. Retry is offered when the AI names something missed or scores under 2, up to 3 attempts. A question to the teacher that got a vote adds 5 to its author (up to 15).
 
 ## Art
 
 The office tileset and the 8 avatar sheets in `public/assets/` come from The Agency (a small multiplayer office game, git author mrosati, local copy in `/Users/nikso/Work/H-Farm/TheAgency`), dedicated to the public domain under CC0; see `public/assets/LICENSE.md`. Tiles are 16 px in an 8-column sheet; avatars are 16×24 frames, 4 columns × 10 rows (idle ×4 directions, walk ×4, sit from behind, drink). Monocraft (SIL OFL) is the UI font. New art should match: 16 px tiles, crisp pixel scaling.
 
-The sheets in `public/assets/fun/` (hats, emote icons, the cat, room props) were drawn with `codex exec` image generation. To add art: ask codex for one sheet on a flat magenta (#FF00FF) background, a strict grid, one item per cell, chunky 16-bit style, no text or shadows; then `node tools/cut-sprites.js in.png out.png --cols N --rows M --cell 16` shrinks it to crisp sprites with a dark outline. Look at the result enlarged before using it.
+The sheets in `public/assets/fun/` (hats, emote icons, the cat, room props, trophies) were drawn with `codex exec` image generation. To add art: ask codex for one sheet on a flat magenta (#FF00FF) background, a strict grid, one item per cell, chunky 16-bit style, no text or shadows; then `node tools/cut-sprites.js in.png out.png --cols N --rows M --cell 16` shrinks it to crisp sprites with a dark outline. Look at the result enlarged before using it.
 
 ## Testing
 

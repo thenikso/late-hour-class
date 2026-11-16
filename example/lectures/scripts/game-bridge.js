@@ -9,6 +9,19 @@
     if (!msg || typeof msg !== 'object') return;
     if (msg.type === 'cge:cue') dispatchEvent(new KeyboardEvent('keydown', { key: 'e' }));
   });
+  // The other way round: the deck can ask the game for a few things. It only works on
+  // the projector, where the teacher's page listens; everywhere else nothing happens.
+  //   classGame.open('g')       open the question with that key
+  //   classGame.trophy('m')     award a trophy
+  //   classGame.timer(120)      show a two minute countdown
+  //   classGame.room('lab')     open the door to another room
+  const command = (action, fields) => window.parent.postMessage({ type: 'cge:command', action, ...fields }, '*');
+  window.classGame = {
+    open: (key) => command('open', { key }),
+    trophy: (id) => command('trophy', { id }),
+    timer: (seconds) => command('timer', { seconds }),
+    room: (room) => command('room', { room }),
+  };
   // Inside the game, slide jumps are instant: a long smooth scroll (say from slide 1
   // to 25) would show every slide in between on the screen.
   const mm = window.matchMedia.bind(window);

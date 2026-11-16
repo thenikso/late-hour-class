@@ -50,6 +50,7 @@ const STUDENT_ACTIONS = {
 const TEACHER_ACTIONS = {
   // the room
   mode: (game, b) => game.setMode(b.mode, { force: b.force }),
+  room: (game, b) => game.openDoor(b.room, Number(b.seconds) || undefined, { force: b.force }),
   seat: (game, b) => game.takeSeats(Number(b.seconds) || 20, { force: b.force }),
   finale: (game, b) => game.setFinale(b.on !== false),
   // the shared screen

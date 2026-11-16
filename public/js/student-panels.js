@@ -2,8 +2,7 @@
 // and the trophy shelf.
 
 import { $, h, bump, sound, toast } from './common.js';
-import { avatarCanvas, iconCanvas } from './sprites.js';
-import { trophyCanvas } from './trophies.js';
+import { avatarCanvas, iconCanvas, trophyCanvas } from './sprites.js';
 import { HATS, hatUnlocked, hatHint } from './fun.js';
 
 export function createPanels({ send }) {
@@ -99,7 +98,7 @@ export function createPanels({ send }) {
       const card = h(
         'div',
         { class: `trophy ${i === focus ? 'focus' : ''}` },
-        trophyCanvas(t.sprite, 4),
+        trophyCanvas(t.sprite, 3),
         h('div', {}, h('b', {}, t.name), h('span', { class: 'quiet small' }, ` · ${t.lesson}`), h('p', {}, t.text), t.example ? h('p', { class: 'quiet' }, `For example: ${t.example}`) : '', t.url ? h('a', { href: t.url, target: '_blank', rel: 'noopener' }, `Slide ${t.slide} ↗`) : ''),
       );
       box.append(card);

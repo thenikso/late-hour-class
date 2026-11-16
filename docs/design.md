@@ -293,4 +293,13 @@ Added on 15 November 2026, the day before the first trial:
 - "Show a sound answer" after the reveal, a "missed most" tally for the teacher, rename.
 - The server rules are split into small files (`game`, `scoring`, `views`, `asks`, `term`, `report`) and the student page into three.
 
-Not built yet: adventure rooms and doors, side rooms, pair tables, spot the bug, code bench, ProseMirror/CodeMirror, an AI check on the questions board, `postMessage` commands beyond the E cue.
+Added on 16 November 2026, to complete the game:
+
+- Rooms as data, with solid furniture. Every thing has a collision box (seeded from The Agency's own shapes); avatars walk around desks and are drawn in front of or behind them. Tap or click the floor to walk there (A* path-finding).
+- Adventure rooms and shared doors (v2): an open floor and a workshop besides the classroom. The door opens for a countdown, the class walks through together, the rest are moved along. A question or a slide names its room; "Take your seat" is the walk back. Rooms are generic rather than themed per exercise, and there are no optional side rooms.
+- Pair up (v3): `pairs: true` on any question; pairs sit side by side, one hand-in counts for both and is scored once. The answer box is not edited live by both.
+- Spot the bug and the code bench (v3): `bug` and `code` question kinds. Student code runs in a Web Worker in the student's own browser.
+- Slides talking to the game (v3): `classGame.open/timer/trophy/room` from a deck on the projector.
+- Trophy art redrawn with codex, like the other fun sheets.
+
+Not built: ProseMirror and CodeMirror (plain text boxes with the same data format), side rooms, an AI check on the questions board.

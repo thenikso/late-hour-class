@@ -6,7 +6,9 @@ import { $, h, store, post, connect, screenFrame, placeFrame, countTo, bump, sou
 import { Room, ROOM_SIZE } from './room.js';
 import { AVATARS, avatarCanvas, iconCanvas } from './sprites.js';
 import { EMOTES } from './fun.js';
-import { clampToFloor, trophyNear } from './world.js';
+import { trophyNear } from './world.js';
+import { walk } from './rooms.js';
+import { findPath } from './path.js';
 import { createSheet } from './student-sheet.js';
 import { createPanels } from './student-panels.js';
 
@@ -24,6 +26,7 @@ let token = store.get('cge-token');
 let state = null; // the latest view from the server
 let me = { x: 16, y: 8, dir: 'down', moving: false }; // our avatar, moved here first and sent to the server
 let warp = -1; // the last server-side move of our avatar we have followed
+let route = []; // spots still to walk through after a tap or click on the floor
 
 const room = new Room($('#room'));
 const frame = screenFrame($('#screen'));
@@ -86,6 +89,7 @@ function start() {
           me.x = self.x;
           me.y = self.y;
           me.dir = self.dir;
+          stopRoute();
         }
         render();
       },
@@ -161,6 +165,19 @@ $('#sound').onclick = () => {
   $('#sound').blur();
 };
 
+// ---- tap or click the floor to walk there -----------------------------------------------
+
+function stopRoute() {
+  route = [];
+  room.target = null;
+}
+
+$('#room').addEventListener('pointerdown', (e) => {
+  if (!state || state.mode === 'present') return;
+  route = findPath(state.room, me, room.spotAt(e.clientX, e.clientY), state.klass.unlocked);
+  room.target = route.at(-1) || null;
+});
+
 // ---- trophies on the wall ---------------------------------------------------------------
 
 const nearbyTrophy = () => (state ? trophyNear(state.trophies.length, me.x, me.y) : -1);
@@ -191,20 +208,31 @@ function loop(t) {
   lastT = t;
   if (state) {
     const locked = state.mode === 'present'; // seated for the explanation
+    const gone = state.players.find((p) => p.id === state.me.id)?.gone; // through the door already
     let dx = 0;
     let dy = 0;
-    if (!locked && !typing()) {
+    if (!locked && !gone && !typing()) {
       if (keys.has('arrowleft') || keys.has('a')) dx -= 1;
       if (keys.has('arrowright') || keys.has('d')) dx += 1;
       if (keys.has('arrowup') || keys.has('w')) dy -= 1;
       if (keys.has('arrowdown') || keys.has('s')) dy += 1;
     }
+    if (dx || dy || locked || gone) stopRoute(); // the keys take over from a tap
+    if (route.length) {
+      // head for the next spot on the route; drop it once we are there
+      dx = route[0].x - me.x;
+      dy = route[0].y - me.y;
+      if (Math.hypot(dx, dy) < WALK_SPEED * dt) {
+        Object.assign(me, route.shift());
+        if (!route.length) room.target = null;
+      }
+    }
     me.moving = !!(dx || dy);
     if (me.moving) {
       const len = Math.hypot(dx, dy);
-      const spot = clampToFloor(me.x + (dx / len) * WALK_SPEED * dt, me.y + (dy / len) * WALK_SPEED * dt);
-      me.x = spot.x;
-      me.y = spot.y;
+      const step = WALK_SPEED * dt;
+      // walk() stops us at furniture and slides us along its edge
+      Object.assign(me, walk(state.room, me, { x: me.x + (dx / len) * step, y: me.y + (dy / len) * step }, state.klass.unlocked));
       me.dir = Math.abs(dx) > Math.abs(dy) ? (dx < 0 ? 'left' : 'right') : dy < 0 ? 'up' : 'down';
     }
     room.setLocal(state.me.id, me.x, me.y, me.dir, me.moving);
@@ -218,6 +246,7 @@ function loop(t) {
     }
     sheet.standingAt(me.x, me.y);
     updateTrophyHint();
+    if (state.door) tickDoor();
     room.draw(t);
   }
   requestAnimationFrame(loop);
@@ -285,7 +314,7 @@ function render() {
   renderMe(s.me);
   classBar($('#klass'), s.klass);
   $('#emotes [data-e="lost"]').setAttribute('aria-pressed', String(!!s.me.lost));
-  $('#mode').textContent = MODE_TEXT[s.mode] || s.mode;
+  $('#mode').textContent = s.room === 'base' ? MODE_TEXT[s.mode] || s.mode : `${s.roomName} · ${MODE_TEXT[s.mode] || s.mode}`;
 
   frame.update(s, s.deckUrl);
   const link = $('#open-screen');
@@ -306,7 +335,10 @@ function renderBanner() {
   clearTimeout(countdownTimer);
   const banner = $('#banner');
   banner.innerHTML = '';
-  if (state.mode === 'seating' && state.seatingEndsAt) {
+  if (state.door) {
+    banner.hidden = false;
+    tickDoor();
+  } else if (state.mode === 'seating' && state.seatingEndsAt) {
     banner.hidden = false;
     tickCountdown();
   } else if (state.spotlight) {
@@ -323,6 +355,14 @@ function tickCountdown() {
   banner.innerHTML = '';
   banner.append('Take your seat! ', h('span', { class: 'countdown' }, left), h('br'), h('span', { class: 'quiet' }, "Walk onto any chair. When time runs out you'll be seated automatically."));
   countdownTimer = setTimeout(tickCountdown, 250);
+}
+
+/** The door is open: say where it leads and how long is left. */
+function tickDoor() {
+  const left = Math.max(0, Math.ceil((state.door.endsAt - Date.now() - room.skew) / 1000));
+  const text = `The door is open: next stop, the ${state.door.name.toLowerCase()}! Walk through it, top left. ${left}`;
+  const banner = $('#banner');
+  if (banner.textContent !== text) banner.textContent = text;
 }
 
 // The soft timer on a question ticks between server updates.

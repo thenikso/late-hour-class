@@ -65,3 +65,10 @@ body.full .screen-frame { z-index: 35; }
 .asks .votes { color: var(--gold); text-align: right; }
 .asks .who { font-size: 15px; color: var(--quiet); }
 .wall .card.example { border-color: var(--good); }
+
+/* code questions */
+.code-lines { margin: 6px 0; padding-left: 40px; background: var(--bg2); border-radius: 4px; }
+.code-lines li { padding: 1px 6px; color: var(--quiet); }
+.code-lines code, pre.code { color: var(--ink); white-space: pre-wrap; font-family: inherit; margin: 4px 0; }
+.code-lines li.right { background: #1d4a30; }
+.code-lines b { color: var(--gold); }
