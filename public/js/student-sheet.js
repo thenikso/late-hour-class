@@ -9,7 +9,8 @@
 import { $, h, store, scoreShow, celebrate, clock } from './common.js';
 import { zoneAt, lineValue, LETTERS, CIRCLED } from './world.js';
 import { marksToHtml } from './marks.js';
-import { bugEditor, codeEditor, codeLines, checkList, runChecks } from './code-bench.js';
+import { proseEditor } from './editors.js';
+import { bugEditor, codeBench, codeLines, checkList, runChecks } from './code-bench.js';
 
 const isSet = (v) => v !== null && v !== undefined;
 
@@ -97,7 +98,7 @@ export function createSheet({ send, room, layout }) {
     if (mine && d.line === null) d.line = mine.line ?? null;
     const out = [];
     if (q.kind === 'bug') out.push(bugEditor(q, d));
-    if (q.kind === 'code') out.push(codeEditor(q, d));
+    if (q.kind === 'code') out.push(codeBench(q, d));
     if (q.kind === 'choice') out.push(choiceEditor(q, d));
     if (q.kind === 'grid') out.push(gridEditor(q, d));
     if (q.kind === 'line') out.push(h('p', { class: 'quiet', id: 'stand-hint' }));
@@ -158,47 +159,29 @@ export function createSheet({ send, room, layout }) {
   }
 
   /**
-   * A plain text box. If the question names parts, a button per part wraps the
-   * selected text as ==①…==, and the preview below shows the parts in colour.
+   * The box for a written answer (see editors.js). If the question names parts,
+   * a button per part wraps the selected text as ==①…==, shown tinted in the box.
    */
   function textEditor(parts, d, label) {
-    const box = h('textarea', { placeholder: label, 'aria-label': label });
-    box.value = d.text;
-    const preview = h('div', { class: 'preview' });
-    const sync = () => {
-      d.text = box.value;
-      preview.innerHTML = marksToHtml(d.text) || '<span class="quiet">Preview</span>';
-    };
-    sync();
-    box.addEventListener('input', sync);
-    // How the answer was written (time spent typing, how much was pasted). The teacher
-    // sees it as a prompt to ask about the answer; it never changes a score.
-    box.addEventListener('keydown', () => {
-      const t = performance.now();
-      if (d.lastKey && t - d.lastKey < 5000) d.activeMs += t - d.lastKey;
-      d.lastKey = t;
+    const editor = proseEditor({
+      value: d.text,
+      label,
+      onChange: (text) => (d.text = text),
+      // How the answer was written (time spent typing, how much was pasted). The teacher
+      // sees it as a prompt to ask about the answer; it never changes a score.
+      onKey() {
+        const t = performance.now();
+        if (d.lastKey && t - d.lastKey < 5000) d.activeMs += t - d.lastKey;
+        d.lastKey = t;
+      },
+      onPaste: (chars) => (d.pastedChars += chars),
     });
-    box.addEventListener('paste', (e) => (d.pastedChars += (e.clipboardData?.getData('text') || '').length));
-
     const wrap = h('div');
     if (parts.length) {
-      const markButtons = parts.map((part, i) => {
-        const b = h('button', { class: `btn small partbtn m${i + 1}`, type: 'button', title: `Mark the selected text as ${part}` }, `${CIRCLED[i]} ${part}`);
-        b.onclick = () => {
-          const { selectionStart: from, selectionEnd: to, value } = box;
-          const inner = value.slice(from, to);
-          box.value = `${value.slice(0, from)}==${CIRCLED[i]}${inner}==${value.slice(to)}`;
-          // the caret goes after the mark, or inside an empty one
-          const caret = from + 3 + inner.length + (inner ? 2 : 0);
-          box.focus();
-          box.setSelectionRange(caret, caret);
-          sync();
-        };
-        return b;
-      });
-      wrap.append(h('div', { class: 'row' }, h('span', { class: 'quiet' }, 'Select text, then mark it:'), markButtons));
+      const buttons = parts.map((part, i) => h('button', { class: `btn small partbtn m${i + 1}`, type: 'button', title: `Mark the selected text as ${part}`, onclick: () => editor.mark(i + 1) }, `${CIRCLED[i]} ${part}`));
+      wrap.append(h('div', { class: 'row' }, h('span', { class: 'quiet' }, 'Select text, then mark it:'), buttons));
     }
-    wrap.append(box, preview);
+    wrap.append(editor.el);
     return wrap;
   }
 

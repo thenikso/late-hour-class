@@ -17,6 +17,7 @@ const loaded = (src) => {
 };
 const sheets = AVATARS.map((a) => loaded(a.file));
 export const tileset = loaded('/assets/tiles/office.png');
+export const panorama = loaded('/assets/room/panorama.png'); // the view outside the glass wall, 512 × 96
 
 // The fun sheets (drawn with codex, cut to size by tools/cut-sprites.js; see fun.js):
 //   hats.png    8 hats, 16 px cells, in HATS order

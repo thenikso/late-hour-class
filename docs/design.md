@@ -302,4 +302,8 @@ Added on 16 November 2026, to complete the game:
 - Slides talking to the game (v3): `classGame.open/timer/trophy/room` from a deck on the projector.
 - Trophy art redrawn with codex, like the other fun sheets.
 
-Not built: ProseMirror and CodeMirror (plain text boxes with the same data format), side rooms, an AI check on the questions board.
+- Editors: CodeMirror 6 for both written answers (marks shown live, like Obsidian) and code, vendored as one bundled file. The spec named ProseMirror for prose; one library does both jobs, and the answer is still plain text.
+- E uses what is next to you (sit, read a trophy, the door, the cat).
+- A glass front wall with a view, trophies on the sill, daylight on the floor.
+
+Not built: side rooms, an AI check on the questions board.

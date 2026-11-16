@@ -15,4 +15,6 @@ The office tileset (`tiles/office.png`) and the avatar sheets (`avatars/ava_*.pn
 - `props.png`: arcade machine, disco ball, trophy, ball in 16 × 32 px cells.
 - `trophies.png`: 10 concept trophies in 16 × 16 px cells (cup, star, measuring tape, ladybug, key, book, flask, light bulb, flag, gear).
 
+`room/panorama.png` (the view outside the glass wall, 512 × 96 px) was drawn the same way and shrunk with `tools/shrink-image.js`.
+
 The solid boxes of the furniture (`js/things.js`) started from the collision shapes in The Agency's map file, also CC0.

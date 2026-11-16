@@ -119,7 +119,14 @@
 .code-lines li.picked { background: #4a3f12; border-left-color: var(--gold); }
 .code-lines li.right { background: #1d4a30; border-left-color: var(--good); }
 .code-lines li.wrong { background: #4a1f2c; border-left-color: var(--bad); }
-textarea.code { min-height: 200px; white-space: pre; overflow: auto; tab-size: 2; font-size: 13px; }
 .checks { list-style: none; padding: 0; margin: 6px 0; font-size: 13px; }
 .no { color: var(--bad); }
 #room { touch-action: none; cursor: pointer; }
+
+/* ---- the editors (CodeMirror, see editors.js) --------------------------------------- */
+.editor { margin-top: 6px; }
+.editor .cm-editor { min-height: 110px; max-height: 40vh; }
+.editor.code .cm-editor { min-height: 190px; font-size: 13px; }
+.editor .cm-scroller { overflow: auto; }
+.mark-badge { font-size: 0.85em; margin-right: 2px; }
+@media (min-width: 1000px) { .editor.prose .cm-editor { min-height: 190px; } }

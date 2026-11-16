@@ -1,0 +1,18 @@
+{
+  "name": "class-game-vendor",
+  "private": true,
+  "description": "Builds public/vendor/codemirror.js: the one bundled library the game uses. Run `npm install && npm run build` in this folder.",
+  "type": "module",
+  "scripts": {
+    "build": "esbuild codemirror.entry.js --bundle --format=esm --minify --legal-comments=inline --outfile=../../public/vendor/codemirror.js"
+  },
+  "dependencies": {
+    "@codemirror/commands": "^6.0.0",
+    "@codemirror/lang-javascript": "^6.0.0",
+    "@codemirror/language": "^6.0.0",
+    "@codemirror/state": "^6.0.0",
+    "@codemirror/view": "^6.0.0",
+    "@lezer/highlight": "^1.0.0",
+    "esbuild": "^0.28.0"
+  }
+}

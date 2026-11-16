@@ -7,7 +7,7 @@ import { Room, ROOM_SIZE } from './room.js';
 import { AVATARS, avatarCanvas, iconCanvas } from './sprites.js';
 import { EMOTES } from './fun.js';
 import { trophyNear } from './world.js';
-import { walk } from './rooms.js';
+import { ROOMS, DOOR, walk } from './rooms.js';
 import { findPath } from './path.js';
 import { createSheet } from './student-sheet.js';
 import { createPanels } from './student-panels.js';
@@ -128,7 +128,8 @@ function onFx(ev) {
 
 const WALK_KEYS = ['arrowup', 'arrowdown', 'arrowleft', 'arrowright', 'w', 'a', 's', 'd'];
 const keys = new Set();
-const typing = () => ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName);
+// true while the student is writing somewhere: the keys must not move the avatar then
+const typing = () => ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName) || !!document.activeElement?.isContentEditable;
 
 addEventListener('keydown', (e) => {
   if (typing()) return;
@@ -140,7 +141,7 @@ addEventListener('keydown', (e) => {
   if (k === 'enter') sheet.pressEnter();
   if (e.repeat || e.metaKey || e.ctrlKey || e.altKey || !state) return;
   if (k >= '1' && k <= String(EMOTES.length)) sendEmote(EMOTES[Number(k) - 1].id);
-  if (k === 't') openTrophyNearby();
+  if (k === 'e') withinReach()?.use();
   if (k === ' ' && document.activeElement?.tagName !== 'BUTTON') {
     e.preventDefault();
     sendEmote('hop');
@@ -172,30 +173,53 @@ function stopRoute() {
   room.target = null;
 }
 
-$('#room').addEventListener('pointerdown', (e) => {
-  if (!state || state.mode === 'present') return;
-  route = findPath(state.room, me, room.spotAt(e.clientX, e.clientY), state.klass.unlocked);
+function walkTo(spot) {
+  route = findPath(state.room, me, spot, state.klass.unlocked);
   room.target = route.at(-1) || null;
+}
+
+$('#room').addEventListener('pointerdown', (e) => {
+  if (state && state.mode !== 'present') walkTo(room.spotAt(e.clientX, e.clientY));
 });
 
-// ---- trophies on the wall ---------------------------------------------------------------
+// ---- E: use what is next to you ----------------------------------------------------------
+// A free chair (sit down), a trophy on the sill (read it), the open door (go through),
+// the class cat (pet it). The hint at the bottom of the screen says what E would do.
 
-const nearbyTrophy = () => (state ? trophyNear(state.trophies.length, me.x, me.y) : -1);
+const near = (spot, reach) => Math.hypot(me.x - spot.x, me.y - spot.y) < reach;
 
-function openTrophyNearby() {
-  const i = nearbyTrophy();
-  if (i >= 0) panels.openTrophies(i);
+/** Is somebody else on this chair? */
+const taken = (seat) => [...room.players.values()].some((p) => p.meta.id !== state.me.id && p.online && Math.abs(p.x - seat.x) < 0.6 && Math.abs(p.y - seat.y) < 0.6);
+
+function sitOn(seat) {
+  stopRoute();
+  Object.assign(me, { x: seat.x, y: seat.y, dir: 'up' });
 }
 
-/** A hint at the bottom of the room when we stand under a trophy. */
-function updateTrophyHint() {
-  const i = nearbyTrophy();
+/** What E would do right now: { label, use }, or null when nothing is within reach. */
+function withinReach() {
+  if (!state || state.mode === 'present') return null;
+  if (state.door && near(DOOR, 5)) return { label: 'go through the door', use: () => walkTo(DOOR) };
+
+  const seats = ROOMS[state.room].seats;
+  const sitting = seats.some((seat) => seat.x === me.x && seat.y === me.y);
+  const chair = seats.filter((seat) => near(seat, 1.3) && !taken(seat)).sort((a, b) => Math.hypot(me.x - a.x, me.y - a.y) - Math.hypot(me.x - b.x, me.y - b.y))[0];
+  if (chair && !sitting) return { label: 'sit down', use: () => sitOn(chair) };
+
+  const trophy = trophyNear(state.trophies.length, me.x, me.y);
+  if (trophy >= 0) return { label: `read “${state.trophies[trophy].name}”`, use: () => panels.openTrophies(trophy) };
+
+  if (room.has('cat') && room.cat && near(room.cat, 1.5)) return { label: 'pet the cat', use: () => sendEmote('heart') };
+  return null;
+}
+
+function updateHint() {
+  const text = withinReach()?.label ? `E · ${withinReach().label}` : '';
   const hint = $('#hint');
-  const text = i >= 0 ? `Press T to read: ${state.trophies[i].name}` : '';
   if (hint.textContent !== text) hint.textContent = text;
-  hint.hidden = !text || state.mode === 'present';
+  hint.hidden = !text;
 }
-$('#hint').onclick = openTrophyNearby;
+$('#hint').onclick = () => withinReach()?.use(); // on a touch screen, tap the hint
 
 // ---- the frame loop: move our avatar, tell the server, draw ---------------------------------
 
@@ -245,7 +269,7 @@ function loop(t) {
       send('move', { x: me.x, y: me.y, dir: me.dir, moving: me.moving, warp }).catch(() => {});
     }
     sheet.standingAt(me.x, me.y);
-    updateTrophyHint();
+    updateHint();
     if (state.door) tickDoor();
     room.draw(t);
   }

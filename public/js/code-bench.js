@@ -7,6 +7,7 @@
 // It never runs on the server or on anyone else's machine.
 
 import { h } from './common.js';
+import { codeEditor } from './editors.js';
 
 const RUN_LIMIT_MS = 2000;
 
@@ -77,11 +78,9 @@ export function checkList(tests, passed) {
   );
 }
 
-/** The code bench: a code box, a Run button and the checks. The draft `d` keeps the code and the last result. */
-export function codeEditor(q, d) {
+/** The code bench: a code editor, a Run button and the checks. The draft `d` keeps the code and the last result. */
+export function codeBench(q, d) {
   d.text ||= q.starter;
-  const box = h('textarea', { class: 'code', spellcheck: 'false', 'aria-label': 'Your code' });
-  box.value = d.text;
   const results = h('div');
   const showResults = (error = null) => {
     results.innerHTML = '';
@@ -89,19 +88,15 @@ export function codeEditor(q, d) {
   };
   showResults();
 
-  box.addEventListener('input', () => {
-    d.text = box.value;
-    d.passed = null; // the code changed: the old result no longer counts
-    showResults();
+  const editor = codeEditor({
+    value: d.text,
+    onChange(text) {
+      d.text = text;
+      d.passed = null; // the code changed: the old result no longer counts
+      showResults();
+    },
+    onPaste: (chars) => (d.pastedChars += chars),
   });
-  box.addEventListener('paste', (e) => (d.pastedChars += (e.clipboardData?.getData('text') || '').length));
-  box.addEventListener('keydown', (e) => {
-    if (e.key !== 'Tab') return;
-    e.preventDefault(); // Tab indents instead of leaving the box
-    box.setRangeText('  ', box.selectionStart, box.selectionEnd, 'end');
-    box.dispatchEvent(new Event('input'));
-  });
-
   const run = h('button', { class: 'btn', type: 'button' }, 'Run the checks ▶');
   run.onclick = async () => {
     run.disabled = true;
@@ -110,5 +105,5 @@ export function codeEditor(q, d) {
     showResults(result.error);
     run.disabled = false;
   };
-  return h('div', {}, box, h('div', { class: 'row' }, run, h('span', { class: 'quiet small' }, 'Your code runs only on this laptop.')), results);
+  return h('div', {}, editor.el, h('div', { class: 'row' }, run, h('span', { class: 'quiet small' }, 'Your code runs only on this laptop.')), results);
 }

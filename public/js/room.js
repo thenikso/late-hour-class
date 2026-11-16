@@ -10,7 +10,7 @@
 import { TILE, COLS, ROWS, SCREEN, FLOOR, TROPHY_SLOTS, zones, LETTERS } from './world.js';
 import { ROOMS, BASE, DOOR, FEET, thingsIn, seatAt } from './rooms.js';
 import { findPath } from './path.js';
-import { drawAvatar, drawHat, hatRise, drawEmote, drawCat, drawProp, drawBall, drawTile, drawTrophy, TROPHY_SIZE, tileset, whenReady } from './sprites.js';
+import { drawAvatar, drawHat, hatRise, drawEmote, drawCat, drawProp, drawBall, drawTile, drawTrophy, TROPHY_SIZE, tileset, panorama, whenReady } from './sprites.js';
 
 const W = COLS * TILE;
 const H = ROWS * TILE;
@@ -24,8 +24,18 @@ const PAPER = '#f6f0ff';
 const GOLD = '#ffcf4a';
 const FONT = 'Monocraft, ui-monospace, monospace';
 
-// Tile ids in the office tileset for the shell (furniture is in things.js).
-const SHELL = { wall: 2, wallTop: 4, window: 3, windowSill: 20, door: 12 };
+// The front wall is glass from the low sill up to the ceiling beam, with the view behind it.
+const WALL = {
+  bottom: 7 * TILE, // where wall meets floor
+  beam: 4, // the ceiling beam's height
+  sill: 98, // top of the low wall under the glass (trophies stand on it)
+  panes: 8, // glass panes across the room
+  frame: '#2a2145',
+  frameLight: '#51447f',
+  ledge: '#c9a070',
+  ledgeDark: '#8a6a45',
+  low: '#3a2f5e',
+};
 const FLOORING = {
   wood: (x, y) => ((x * 7 + y * 3) % 5 === 0 ? 1 : 0), // two kinds of board, for a little variety
   carpet: () => 16,
@@ -33,6 +43,71 @@ const FLOORING = {
 };
 
 const still = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/** The glass wall: the view, a few clouds, reflections, then the frame, the sill and the door. */
+function paintWall(g) {
+  g.fillStyle = '#a9defa';
+  g.fillRect(0, 0, W, WALL.bottom);
+  if (panorama.complete && panorama.naturalWidth) g.drawImage(panorama, 0, WALL.beam);
+
+  // small flat-bottomed clouds, to the sides of the screen
+  g.fillStyle = '#ffffff';
+  for (const [x, y, w] of [[26, 16, 22], [96, 30, 14], [372, 14, 18], [446, 26, 24]]) {
+    g.fillRect(x, y, w, 3);
+    g.fillRect(x + 3, y - 2, w - 9, 2);
+    g.fillRect(x + 7, y - 4, Math.max(4, w - 16), 2);
+  }
+
+  // glass: two pale streaks of reflection on every pane
+  const pane = W / WALL.panes;
+  g.fillStyle = 'rgba(255,255,255,0.10)';
+  for (let i = 0; i < WALL.panes; i++)
+    for (const [offset, width] of [[14, 7], [26, 3]]) {
+      g.beginPath();
+      g.moveTo(i * pane + offset + 24, WALL.beam);
+      g.lineTo(i * pane + offset + 24 + width, WALL.beam);
+      g.lineTo(i * pane + offset + width, WALL.sill);
+      g.lineTo(i * pane + offset, WALL.sill);
+      g.fill();
+    }
+
+  // the frame: ceiling beam, a thin rail, and a post between panes
+  g.fillStyle = WALL.frame;
+  g.fillRect(0, 0, W, WALL.beam);
+  g.fillRect(0, 44, W, 2);
+  for (let i = 0; i <= WALL.panes; i++) {
+    const x = Math.min(W - 3, Math.max(0, Math.round(i * pane) - 1));
+    g.fillStyle = WALL.frame;
+    g.fillRect(x, 0, 3, WALL.sill);
+    g.fillStyle = WALL.frameLight;
+    g.fillRect(x, WALL.beam, 1, WALL.sill - WALL.beam);
+  }
+
+  // the low wall under the glass, with a wooden ledge on top
+  g.fillStyle = WALL.low;
+  g.fillRect(0, WALL.sill, W, WALL.bottom - WALL.sill);
+  g.fillStyle = WALL.ledge;
+  g.fillRect(0, WALL.sill, W, 2);
+  g.fillStyle = WALL.ledgeDark;
+  g.fillRect(0, WALL.sill + 2, W, 1);
+  g.fillStyle = 'rgba(0,0,0,0.3)';
+  g.fillRect(0, WALL.bottom - 2, W, 2); // the skirting, in shadow
+
+  // the door: a wooden leaf with a small window, and a green sign above it
+  const dx = DOOR.x * TILE;
+  g.fillStyle = WALL.frame;
+  g.fillRect(dx - 1, 68, 18, WALL.bottom - 68);
+  g.fillStyle = '#8a5a2b';
+  g.fillRect(dx + 1, 70, 14, WALL.bottom - 70);
+  g.fillStyle = '#a9703a';
+  g.fillRect(dx + 2, 71, 12, 1);
+  g.fillStyle = '#bfe6fb';
+  g.fillRect(dx + 4, 74, 8, 10);
+  g.fillStyle = GOLD;
+  g.fillRect(dx + 12, 92, 2, 2);
+  g.fillStyle = '#5ee08a';
+  g.fillRect(dx + 4, 63, 8, 3);
+}
 
 /** The part of a room that never changes: painted once at 16 px per tile, then scaled up crisply. */
 function paintShell(roomId) {
@@ -42,17 +117,21 @@ function paintShell(roomId) {
   c.height = H;
   const g = c.getContext('2d');
   g.imageSmoothingEnabled = false;
-  const put = (id, x, y) => drawTile(g, id, x, y, TILE);
 
-  for (let y = 6; y < ROWS; y++) for (let x = 0; x < COLS; x++) put(FLOORING[room.flooring](x, y), x, y);
-  for (let y = 0; y < 7; y++) for (let x = 0; x < COLS; x++) put(y === 0 ? SHELL.wallTop : SHELL.wall, x, y);
-  g.fillStyle = 'rgba(0,0,0,0.25)';
-  g.fillRect(0, 6.5 * TILE, W, 2); // the shadow where wall meets floor
-  for (const x of [3, 4, 5, 26, 27, 28]) {
-    put(SHELL.window, x, 2);
-    put(SHELL.windowSill, x, 3);
+  for (let y = 7; y < ROWS; y++) for (let x = 0; x < COLS; x++) drawTile(g, FLOORING[room.flooring](x, y), x, y, TILE);
+  paintWall(g);
+
+  // daylight falling through each pane onto the floor
+  const pane = W / WALL.panes;
+  g.fillStyle = 'rgba(255, 244, 214, 0.09)';
+  for (let i = 0; i < WALL.panes; i++) {
+    g.beginPath();
+    g.moveTo(i * pane + 8, WALL.bottom);
+    g.lineTo((i + 1) * pane - 6, WALL.bottom);
+    g.lineTo((i + 1) * pane - 22, WALL.bottom + 40);
+    g.lineTo(i * pane - 8, WALL.bottom + 40);
+    g.fill();
   }
-  put(SHELL.door, DOOR.x, DOOR.y - 1);
 
   // The screen's frame. The shared page itself is an iframe laid over it.
   const [sx, sy, sw, sh] = [SCREEN.x, SCREEN.y, SCREEN.w, SCREEN.h].map((v) => v * TILE);
@@ -63,8 +142,15 @@ function paintShell(roomId) {
   g.fillStyle = '#ffffff';
   g.fillRect(sx, sy, sw, sh);
 
-  // Things that lie flat on the floor (chairs) are part of the shell: avatars always go on top.
-  for (const thing of thingsIn(roomId)) if (thing.def.flat) drawThing(g, thing);
+  for (const thing of thingsIn(roomId)) {
+    // Things that lie flat on the floor (chairs) are part of the shell: avatars always go on top.
+    if (thing.def.flat) drawThing(g, thing);
+    // Everything solid casts a little shadow at its foot.
+    else if (thing.solid) {
+      g.fillStyle = 'rgba(0,0,0,0.16)';
+      g.fillRect(thing.solid.x * TILE + 1, (thing.solid.y + thing.solid.h) * TILE - 1, thing.solid.w * TILE - 2, 3);
+    }
+  }
   return c;
 }
 
@@ -114,7 +200,7 @@ export class Room {
     this.canvas = canvas;
     this.g = canvas.getContext('2d');
     this.shells = new Map(); // room id -> painted shell
-    whenReady(tileset, () => this.shells.clear()); // repaint once the tiles have loaded
+    for (const image of [tileset, panorama]) whenReady(image, () => this.shells.clear()); // repaint once the art has loaded
     this.players = new Map(); // id -> { meta, x, y, rx, ry, dir, moving, online }
     this.state = null;
     this.roomId = BASE;
@@ -123,6 +209,7 @@ export class Room {
     this.dpr = 1;
     this.showNames = true;
     this.target = null; // { x, y }: where a tap is sending our avatar
+    this.cat = null; // { x, y, pose }: where the class cat is, once the class has one
     // short-lived effects
     this.emotes = new Map(); // player id -> { e, t0 }
     this.hops = new Map(); // player id -> start time
@@ -368,7 +455,7 @@ export class Room {
     const pulse = still() ? 0.6 : 0.45 + 0.3 * Math.sin(t / 220);
     g.fillStyle = GOLD;
     g.globalAlpha = pulse;
-    g.fillRect(x + 3, y + 3, 10, 12); // light through the doorway
+    g.fillRect(x + 1, 70, 14, WALL.bottom - 70); // light through the doorway
     g.globalAlpha = 0.25 + pulse * 0.4;
     g.fillRect(x - 2, y + TILE, 20, 14); // and spilling onto the floor
     g.globalAlpha = 1;
@@ -487,6 +574,7 @@ export class Room {
     }
     if (this.has('cat')) {
       const cat = catAt(Date.now() + this.skew, mode === 'present' || mode === 'seating' || still(), this.unlocked);
+      this.cat = cat; // where it is now, for the student page (press E to pet it)
       const x = (cat.x + FEET.x) * TILE;
       const y = (cat.y + FEET.y) * TILE;
       out.push({

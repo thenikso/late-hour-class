@@ -4,7 +4,7 @@ The design and its reasons are in [docs/design.md](docs/design.md); notes for wo
 
 A pixel-art classroom that runs from the teacher's laptop. Students join from their own browser over the classroom Wi-Fi, pick an avatar and walk around a shared room. The teacher drives the slides on the room's screen, seats everyone for explanations, opens questions, and reveals scores with a bit of show.
 
-One Node process, no dependencies, no build step. Node 20 or later.
+One Node process, nothing to install, no build step. Node 20 or later. The only outside code is CodeMirror, the editor students type in, which ships ready-made in `public/vendor/`.
 
 ## Run the Week 8 example
 
@@ -65,7 +65,7 @@ The flags next to answers (short, unmarked parts, mostly pasted, written very fa
 - **line:** an opinion line. Students stand anywhere between two ends ("Disagree" … "Agree"); the result is the spread across the room. Never right or wrong.
 - **bug:** spot the bug. Students click the faulty line of a piece of code; you see who found it and how fast.
 - **code:** the code bench. Students write JavaScript and run it against the lesson's checks. The code runs only in their own browser; you see the code next to the ticks.
-- **text:** a written answer. If the question names parts, students mark them in their text with buttons that write `==①…==`; correctly marked parts raise the multiplier.
+- **text:** a written answer. If the question names parts, students mark them in their text with buttons that write `==①…==` (shown as a tinted span with a numbered badge; the `==` only appear while the cursor is on them); correctly marked parts raise the multiplier.
 
 Any question can be **pair work** (`"pairs": true`): students are put in twos and seated side by side, one hand-in counts for both, and it is scored once.
 
@@ -82,6 +82,7 @@ AI scoring sends the question, the rubric and the answers (as a1, a2…, no name
 ## The fun parts
 
 - **Walking:** arrow keys or WASD, or tap/click the floor and your avatar finds its way there. Furniture is solid: you walk around desks, and you can stand behind or in front of them.
+- **E:** use what is next to you. Sit on a free chair, read a trophy on the sill, go through the open door, pet the cat. A hint at the bottom of the screen says what E would do; on a touch screen, tap the hint.
 - **Reactions:** six bubbles over your avatar (keys 1–6 or the top bar), and Space to hop. *I'm lost* also tells the teacher, quietly; *Got it* clears it.
 - **Hats:** your own points unlock hats; improving an answer on a retry unlocks the scholar cap.
 - **Class goal:** everyone's points fill one bar. Each level adds something to the room for all: fairy lights, a cat, an arcade machine and a ball to kick around in breaks, a disco ball at results time, a golden trophy.
@@ -138,10 +139,11 @@ To run another deck: `node server.js --lesson <teacher deck url> --deck <student
 - `lib/`: the room and its rules (`game.js`), points (`scoring.js`), what each role sees (`views.js`), the questions board (`asks.js`), what carries over between lessons (`term.js`), the report (`report.js`), the lesson reader (`manifest.js`), quick checks (`checks.js`), AI scoring (`ai.js`).
 - `public/`: the three pages (student, teacher, projector), the room and avatar drawing, styles. The rooms are data: `js/rooms.js` (what stands where), `js/things.js` (furniture and its solid boxes), `js/path.js` (finding a way around it).
 - `public/assets/`: the office tileset and the 8 avatar sheets, from The Agency (CC0 1.0, see `public/assets/LICENSE.md`).
-- `tools/cut-sprites.js`: shrinks an AI-drawn sprite sheet to crisp game-size sprites. `tools/report.js`: the session report.
+- `public/vendor/codemirror.js`: CodeMirror 6 (MIT), bundled once from `tools/vendor/` (`npm install && npm run build` there to rebuild). The editors built on it are in `public/js/editors.js`.
+- `tools/cut-sprites.js`: shrinks an AI-drawn sprite sheet to crisp game-size sprites. `tools/shrink-image.js` does the same for a whole picture (the view outside the windows). `tools/report.js`: the session report.
 - `example/lectures/`: the Week 8 deck, made game-ready.
 - `data/`: one session file per class, with names and answers. It is git-ignored; keep it off any public repository.
 
 ## Not built
 
-The rich text and code editors (ProseMirror, CodeMirror: the answer boxes are plain text boxes), optional side rooms for early finishers, an AI check on the questions board, and sign-in with school accounts.
+Optional side rooms for early finishers, an AI check on the questions board, and sign-in with school accounts.

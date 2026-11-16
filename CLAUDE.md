@@ -28,7 +28,7 @@ The Monocraft font is committed in `public/fonts/`; there is no download step.
 
 ## Hard rules
 
-- **Zero dependencies, no build step.** Node 20+ built-ins only on the server; plain ES modules, HTML and CSS in the browser. Students may read every file one day, so keep the code plain and commented where it isn't obvious. If an editor (ProseMirror, CodeMirror) arrives later, it comes as one pre-bundled vendored file; the game's own code stays unbundled.
+- **No install, no build step.** Node 20+ built-ins only on the server; plain ES modules, HTML and CSS in the browser. Students may read every file one day, so keep the code plain and commented where it isn't obvious. The one outside library is CodeMirror 6, vendored as a single pre-bundled file (`public/vendor/codemirror.js`, rebuilt from `tools/vendor/`); it holds no game logic, and the game's own code stays unbundled. Don't add another dependency without asking Nicola.
 - **The engine is course-neutral.** No Software Engineering or H-Farm logic in `server.js`, `lib/` or `public/`. Course content arrives only through a lesson manifest (in a deck or a JSON file) and a deck URL. The Week 8 deck in `example/` is just an example.
 - **The server is the only source of truth.** Clients send intentions (move, answer); the server validates, decides and broadcasts. Zone answers use the player's position on the server, not what the client claims. The one exception is the code bench: student code runs only in that student's browser (a Web Worker), which reports which checks passed; the teacher sees the code beside the result. Never run student code on the server.
 - **Student text is never rendered as HTML.** Use `textContent`, the `h()` helper in `public/js/common.js`, or `marksToHtml()` (which escapes first). Keep it that way everywhere, including the projector.
@@ -55,12 +55,15 @@ The Monocraft font is committed in `public/fonts/`; there is no download step.
 - `public/js/rooms.js`: the rooms as data (`base` classroom, `floor` open floor, `lab` workshop) and the walking rules: `thingsIn`, `canStand`, `walk`, `nearestFree`, `arrivalSpots`, seats and pair seats. `public/js/things.js` is the furniture catalogue: tiles and the solid box of each thing.
 - `public/js/path.js`: A* over a half-tile grid (`findPath`), for tap-to-walk and the cat.
 - `public/js/room.js` draws a room on one canvas: the shell painted once, then furniture and avatars together in baseline order (that is what puts one in front of another), then labels at screen resolution. `public/js/sprites.js` loads the tileset, avatar and fun sheets.
-- `public/js/code-bench.js`: the spot-the-bug and code editors, and the Web Worker that runs a student's code.
+- `public/js/code-bench.js`: spot the bug, the code bench, and the Web Worker that runs a student's code.
+- `public/js/editors.js`: the two CodeMirror editors: `proseEditor` (part marks shown tinted, their `==①` hidden until the cursor is on them) and `codeEditor` (JavaScript). Both hold plain text, so the answer format is the same as a text box.
 - `public/js/student.js` (join, walking, top bar), `student-sheet.js` (the question sheet and result card), `student-panels.js` (hats, Ask, trophies), `teacher.js`, `screen.js`: the three pages. `common.js` has the DOM helper, the SSE connection, the screen iframe and the score count-up.
 - `tools/serve-slides.js`: serves a lectures folder twice. The student copy strips speaker notes (`.sn`) and the answer boxes (`data-cue`) on `data-mode="work"` slides; the teacher copy is the full deck, on localhost only.
 - `example/lectures/`: copies of the course's slide engine and the Week 8 deck, plus `scripts/game-bridge.js`.
 
 A player's position is the top-left of the tile they fill; their feet (`FEET`, and the small `FOOT_BOX` that collides) are near its bottom. The browser walks with `walk()` (it slides along furniture); the server only checks `canStand()` for each reported position and ignores a move into something solid. Every room must keep the door, the hot seat, the front strip and every seat free: a test checks it.
+
+On the student page E uses what is within reach (`withinReach()` in `student.js`: sit, read a trophy, the open door, the cat); add new interactions there. Sitting is just standing exactly on a chair's spot.
 
 When the server moves a player (a seat, the hot seat, another room) it calls `Game.place`, which raises that player's `warp` number. The browser follows when it sees a new number and echoes it with every move; a move carrying an old number is ignored.
 
@@ -94,6 +97,8 @@ Next to `questions`, `trophies`: `[{ after, name, sprite, text, example, slide }
 Scoring lives in `lib/scoring.js` (`breakdown()`): handed in 10; a hand-in streak +5 per question in a row (up to +25); +10 each when everyone online handed in before the close; right choice (or bug line) 30, half 15; right reason 15; 10 per right grid row or passing check; AI/teacher score ×15 (0–3); +0.5 multiplier per correctly marked part. Retry is offered when the AI names something missed or scores under 2, up to 3 attempts. A question to the teacher that got a vote adds 5 to its author (up to 15).
 
 ## Art
+
+The front wall is glass: `paintWall()` in `room.js` draws the view (`public/assets/room/panorama.png`, 512 × 96, drawn with codex and shrunk with `tools/shrink-image.js`), then the frame, the sill and the door in code. Trophies stand on the sill.
 
 The office tileset and the 8 avatar sheets in `public/assets/` come from The Agency (a small multiplayer office game, git author mrosati, local copy in `/Users/nikso/Work/H-Farm/TheAgency`), dedicated to the public domain under CC0; see `public/assets/LICENSE.md`. Tiles are 16 px in an 8-column sheet; avatars are 16×24 frames, 4 columns × 10 rows (idle ×4 directions, walk ×4, sit from behind, drink). Monocraft (SIL OFL) is the UI font. New art should match: 16 px tiles, crisp pixel scaling.
 

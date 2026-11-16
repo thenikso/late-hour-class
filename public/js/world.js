@@ -15,7 +15,8 @@ export const SCREEN = { x: 10.7, y: 0.3, w: 10.6, h: 5.9625 };
 // top-left corner of the tile the player fills, so x runs from 1 to 30.)
 export const FLOOR = { x: 1, y: 7, w: 30, h: 10.4 };
 
-// Concept trophies sit on two shelves on the front wall, left and right of the screen.
+// Concept trophies stand on the sill under the glass wall, and on a shelf above it,
+// left and right of the screen.
 // A slot is the top-left corner of one trophy, in tiles.
 const SHELF_ROWS = [5.3, 4.1];
 const SHELF_COLS = [2, 3, 4, 5, 6, 7, 8, 9, 22, 23, 24, 25, 26, 27, 28, 29];
