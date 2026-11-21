@@ -40,6 +40,7 @@
       "kind": "code",
       "title": "Code bench · isEven",
       "prompt": "Write isEven(n): true when n is even, false when it is odd.",
+      "stretch": "Try handling negative numbers and decimals too (e.g. isEven(-4) === true, isEven(2.5) === false).",
       "starter": "function isEven(n) {\n  // your code here\n}\n",
       "tests": [
         { "name": "isEven(4) is true", "check": "isEven(4) === true" },

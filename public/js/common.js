@@ -1,6 +1,7 @@
 // Shared browser helpers: server connection, the screen iframe, score effects.
 
 export const $ = (sel, root = document) => root.querySelector(sel);
+
 export const h = (tag, attrs = {}, ...kids) => {
   const el = document.createElement(tag);
   for (const [k, v] of Object.entries(attrs || {})) {
@@ -10,7 +11,11 @@ export const h = (tag, attrs = {}, ...kids) => {
     else if (k === 'html') el.innerHTML = v;
     else el.setAttribute(k, v === true ? '' : v);
   }
-  for (const kid of kids.flat()) if (kid !== null && kid !== undefined && kid !== false) el.append(kid.nodeType ? kid : String(kid));
+  for (const kid of kids.flat()) {
+    if (kid !== null && kid !== undefined && kid !== false) {
+      el.append(kid.nodeType ? kid : String(kid));
+    }
+  }
   return el;
 };
 
@@ -35,7 +40,11 @@ export const store = {
 };
 
 export async function post(path, body = {}) {
-  const res = await fetch(path, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+  const res = await fetch(path, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(body),
+  });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw Object.assign(new Error(data.error || `HTTP ${res.status}`), { status: res.status, data });
   return data;
@@ -54,11 +63,11 @@ export function connect(query, { onState, onPos, onGone, onStatus, onFx, onBall 
     es.addEventListener('kicked', () => {
       dead = true;
       es.close();
-      onGone && onGone('kicked');
+      if (onGone) onGone('kicked');
     });
     es.onopen = () => onStatus && onStatus(true);
     es.onerror = async () => {
-      onStatus && onStatus(false);
+      if (onStatus) onStatus(false);
       if (dead) return;
       // A 401/403 means our token or key is no longer valid: stop retrying.
       if (es.readyState === EventSource.CLOSED) {
@@ -67,17 +76,24 @@ export function connect(query, { onState, onPos, onGone, onStatus, onFx, onBall 
         ctl.abort();
         if (r && (r.status === 401 || r.status === 403)) {
           dead = true;
-          onGone && onGone('auth');
-        } else setTimeout(open, 1500);
+          if (onGone) onGone('auth');
+        } else {
+          setTimeout(open, 1500);
+        }
       }
     };
   };
   open();
-  return { close: () => ((dead = true), es.close()) };
+  return {
+    close() {
+      dead = true;
+      es.close();
+    },
+  };
 }
 
 /**
- * Put the shared page in a box. The page always renders at 1280×720 and is scaled
+ * Put the shared page in a box. The page always renders at 1280x720 and is scaled
  * (letterboxed) into the box, so the deck never reflows when the box grows or shrinks:
  * slides keep their projector layout and the scroll position stays on the right slide.
  */
@@ -126,6 +142,7 @@ export function screenFrame(iframe) {
 }
 
 // ---- sound: tiny blips, off until someone turns them on ----------------------
+
 let audio = null;
 export const sound = {
   on: false,
@@ -159,13 +176,18 @@ const TUNES = {
   timeup: [[12, 0], [7, 160]],
 };
 sound.tune = function (name) {
-  for (const [step, at] of TUNES[name] || []) setTimeout(() => this.blip(step, 'triangle'), at);
+  for (const [step, at] of TUNES[name] || []) {
+    setTimeout(() => this.blip(step, 'triangle'), at);
+  }
 };
 
 /** A toast: a short message that slides in at the top and leaves by itself. */
 export function toast(text, { icon = null, ms = 4500 } = {}) {
   let box = $('#toasts');
-  if (!box) document.body.append((box = h('div', { id: 'toasts', class: 'toasts', 'aria-live': 'polite' })));
+  if (!box) {
+    box = h('div', { id: 'toasts', class: 'toasts', 'aria-live': 'polite' });
+    document.body.append(box);
+  }
   const el = h('div', { class: 'toast panel' }, icon, h('span', {}, text));
   box.append(el);
   setTimeout(() => el.classList.add('out'), ms);
@@ -256,6 +278,7 @@ export async function countTo(el, from, to, ms = 500) {
     requestAnimationFrame(step);
   });
 }
+
 const fmt = (n) => (Number.isInteger(n) ? String(n) : Math.abs(n % 1) < 0.05 ? String(Math.round(n)) : n.toFixed(1));
 
 /**
@@ -275,7 +298,14 @@ export async function scoreShow(root, breakdown, { fast = false } = {}) {
   const gap = fast || reduced() ? 0 : 380;
   for (const s of breakdown.steps) {
     await sleep(gap);
-    steps.append(h('li', {}, h('span', {}, s.label), s.chips ? h('span', { class: 'c' }, `+${s.chips}`) : h('span', { class: 'm' }, `+${s.mult} mult`)));
+    steps.append(
+      h(
+        'li',
+        {},
+        h('span', {}, s.label),
+        s.chips ? h('span', { class: 'c' }, `+${s.chips}`) : h('span', { class: 'm' }, `+${s.mult} mult`),
+      ),
+    );
     if (s.chips) {
       await countTo(chips, c, c + s.chips, gap ? 260 : 0);
       c += s.chips;

@@ -54,7 +54,7 @@
   .sheet {
     left: auto;
     right: 10px;
-    top: 56px;
+    top: var(--hud-h, 56px);
     bottom: 10px;
     transform: none;
     width: min(440px, 36vw);
@@ -114,6 +114,9 @@
 .code-lines.pickable li { cursor: pointer; }
 .code-lines.pickable li:hover { background: #3b2e6b; }
 .checks { list-style: none; padding: 0; margin: 6px 0; font-size: 13px; }
+.while-waiting { margin-top: 10px; padding-top: 8px; border-top: 1px dashed #45367a; }
+.while-waiting p { margin: 4px 0 0; }
+.hop-btn { font-size: 14px; font-weight: bold; color: var(--gold); padding: 2px 6px !important; }
 #room { touch-action: none; cursor: pointer; }
 
 /* ---- the editors (CodeMirror, see editors.js) --------------------------------------- */

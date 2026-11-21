@@ -7,17 +7,28 @@ import { HATS, hatUnlocked, hatHint } from './shared/fun.js';
 
 export function createPanels({ send }) {
   let state = null;
+  const allModals = [];
 
-  /** Wire a button to open a panel and another to close it. */
+  /** Wire a button to open a modal panel, a close button, and backdrop clicks. */
   function panel(id, onOpen) {
     const el = $(`#${id}`);
+    allModals.push(el);
     $(`#${id}-open`).onclick = (e) => {
       el.hidden = false;
       onOpen();
       e.currentTarget.blur(); // so Space hops again instead of pressing the button
     };
-    $(`#${id}-close`).onclick = () => (el.hidden = true);
+    $(`#${id}-close`).onclick = () => {
+      el.hidden = true;
+    };
+    el.addEventListener('click', (e) => {
+      if (e.target === el) el.hidden = true;
+    });
     return el;
+  }
+
+  function closeAll() {
+    for (const el of allModals) el.hidden = true;
   }
 
   // ---- hats: unlocked by points over the term, or by improving an answer ----------------
@@ -31,11 +42,24 @@ export function createPanels({ send }) {
     const grid = $('#hat-grid');
     grid.innerHTML = '';
     const wear = (id) => send('hat', { hat: id }).catch((e) => toast(e.message));
-    grid.append(h('button', { type: 'button', 'aria-pressed': String(!me.hat), onclick: () => wear('') }, avatarCanvas(me.avatar, 3, { reserveHat: true }), 'No hat'));
+    grid.append(
+      h(
+        'button',
+        { type: 'button', 'aria-pressed': String(!me.hat), onclick: () => wear('') },
+        avatarCanvas(me.avatar, 3, { reserveHat: true }),
+        'No hat',
+      ),
+    );
     for (const hat of HATS) {
       const open = hatUnlocked(hat, me.term);
       grid.append(
-        h('button', { type: 'button', disabled: !open, 'aria-pressed': String(me.hat === hat.id), onclick: () => wear(hat.id) }, avatarCanvas(me.avatar, 3, { hat: hat.id, reserveHat: true }), hat.name, open ? null : h('span', { class: 'hint' }, hatHint(hat))),
+        h(
+          'button',
+          { type: 'button', disabled: !open, 'aria-pressed': String(me.hat === hat.id), onclick: () => wear(hat.id) },
+          avatarCanvas(me.avatar, 3, { hat: hat.id, reserveHat: true }),
+          hat.name,
+          open ? null : h('span', { class: 'hint' }, hatHint(hat)),
+        ),
       );
     }
     $('#hat-total').textContent = `You have ${me.term.points} points so far this term.`;
@@ -44,7 +68,9 @@ export function createPanels({ send }) {
   function announceNewHats() {
     const open = HATS.filter((hat) => hatUnlocked(hat, state.me.term));
     const fresh = knownHats ? open.filter((hat) => !knownHats.includes(hat.id)) : [];
-    for (const hat of fresh) toast(`New hat: ${hat.name}! Open Hats to wear it.`, { icon: iconCanvas('hat', hat.id, 2) });
+    for (const hat of fresh) {
+      toast(`New hat: ${hat.name}! Open Hats to wear it.`, { icon: iconCanvas('hat', hat.id, 2) });
+    }
     if (fresh.length) {
       sound.tune('hat');
       bump($('#hats-open'));
@@ -54,7 +80,16 @@ export function createPanels({ send }) {
 
   // ---- the questions board ------------------------------------------------------------------
 
-  const asks = panel('asks', () => (renderAsks(), $('#ask-text').focus()));
+  const asks = panel('asks', () => {
+    renderAsks();
+    $('#ask-text').focus();
+  });
+
+  function openAsks() {
+    asks.hidden = false;
+    renderAsks();
+    $('#ask-text').focus();
+  }
 
   $('#ask-form').onsubmit = async (e) => {
     e.preventDefault();
@@ -80,29 +115,57 @@ export function createPanels({ send }) {
     if (!list.length) ul.append(h('li', { class: 'quiet' }, 'No questions yet. Be the first.'));
     for (const it of list) {
       const held = it.status === 'held';
-      const vote = h('button', { class: `btn small ${it.voted ? 'on' : ''}`, type: 'button', disabled: it.mine, title: it.mine ? 'Your question' : 'I was wondering that too', onclick: () => send('vote', { id: it.id }).catch(() => {}) }, `▲ ${it.votes}`);
-      ul.append(h('li', {}, held ? h('span', { class: 'chip info' }, 'with the teacher') : vote, h('span', { class: 'grow' }, it.text), h('span', { class: 'quiet small' }, it.mine ? 'you' : it.name)));
+      const vote = h(
+        'button',
+        {
+          class: `btn small ${it.voted ? 'on' : ''}`,
+          type: 'button',
+          disabled: it.mine,
+          title: it.mine ? 'Your question' : 'I was wondering that too',
+          onclick: () => send('vote', { id: it.id }).catch(() => {}),
+        },
+        `▲ ${it.votes}`,
+      );
+      ul.append(
+        h(
+          'li',
+          {},
+          held ? h('span', { class: 'chip info' }, 'with the teacher') : vote,
+          h('span', { class: 'grow' }, it.slide ? h('span', { class: 'chip info' }, `s${it.slide}`) : '', it.text),
+          h('span', { class: 'quiet small' }, it.mine ? 'you' : it.name),
+        ),
+      );
     }
   }
 
   // ---- trophies: what the class has learned so far ----------------------------------------------
 
-  const trophies = panel('trophies', () => renderTrophies(-1));
+  const trophies = panel('trophies', () => renderTrophies([]));
 
-  /** The list of trophy cards; `focus` is the one the student walked up to. */
+  /** The list of trophy cards; `focus` is the slot index (or list of indices) the student walked under. */
   function renderTrophies(focus) {
+    const focused = new Set(Array.isArray(focus) ? focus : focus >= 0 ? [focus] : []);
+    const scrollTarget = Array.isArray(focus) ? focus.at(-1) : focus;
     const list = state?.trophies || [];
     const box = $('#trophy-list');
     box.innerHTML = '';
     list.forEach((t, i) => {
       const card = h(
         'div',
-        { class: `trophy ${i === focus ? 'focus' : ''}` },
+        { class: `trophy ${focused.has(i) ? 'focus' : ''}` },
         trophyCanvas(t.sprite, 3),
-        h('div', {}, h('b', {}, t.name), h('span', { class: 'quiet small' }, ` · ${t.lesson}`), h('p', {}, t.text), t.example ? h('p', { class: 'quiet' }, `For example: ${t.example}`) : '', t.url ? h('a', { href: t.url, target: '_blank', rel: 'noopener' }, `Slide ${t.slide} ↗`) : ''),
+        h(
+          'div',
+          {},
+          h('b', {}, t.name),
+          h('span', { class: 'quiet small' }, ` · ${t.lesson}`),
+          h('p', {}, t.text),
+          t.example ? h('p', { class: 'quiet' }, `For example: ${t.example}`) : '',
+          t.url ? h('a', { href: t.url, target: '_blank', rel: 'noopener' }, `Slide ${t.slide} ↗`) : '',
+        ),
       );
       box.append(card);
-      if (i === focus) setTimeout(() => card.scrollIntoView({ block: 'nearest' }));
+      if (i === scrollTarget) setTimeout(() => card.scrollIntoView({ block: 'nearest' }));
     });
   }
 
@@ -121,5 +184,5 @@ export function createPanels({ send }) {
     $('#trophies-open').textContent = `Trophies (${count})`;
   }
 
-  return { render, openTrophies };
+  return { render, openTrophies, openAsks, closeAll };
 }

@@ -6,8 +6,8 @@ import { $, h, store, post, connect, screenFrame, placeFrame, countTo, bump, sou
 import { Room, ROOM_SIZE } from './room.js';
 import { AVATARS, avatarCanvas, iconCanvas } from './sprites.js';
 import { EMOTES } from './shared/fun.js';
-import { trophyNear } from './shared/world.js';
-import { ROOMS, DOOR, walk } from './shared/rooms.js';
+import { trophiesNear } from './shared/world.js';
+import { ROOMS, BASE, DOOR, walk } from './shared/rooms.js';
 import { findPath } from './shared/path.js';
 import { createSheet } from './student-sheet.js';
 import { createPanels } from './student-panels.js';
@@ -27,6 +27,7 @@ let state = null; // the latest view from the server
 let me = { x: 16, y: 8, dir: 'down', moving: false }; // our avatar, moved here first and sent to the server
 let warp = -1; // the last server-side move of our avatar we have followed
 let route = []; // spots still to walk through after a tap or click on the floor
+let looping = false; // prevents stacking multiple requestAnimationFrame loops after a rejoin
 
 const room = new Room($('#room'));
 const frame = screenFrame($('#screen'));
@@ -34,8 +35,8 @@ const frame = screenFrame($('#screen'));
 /** Send one of our intentions to the server. */
 const send = (action, body = {}) => post(`/api/${action}`, { token, ...body });
 
-const sheet = createSheet({ send, room, layout });
 const panels = createPanels({ send });
+const sheet = createSheet({ send, room, layout, panels });
 
 // ---- join -------------------------------------------------------------------------
 
@@ -78,7 +79,7 @@ function start() {
   connect(
     { role: 'student', token },
     {
-      onState: (s) => {
+      onState(s) {
         state = s;
         room.selfId = s.me.id;
         room.setState(s);
@@ -96,15 +97,20 @@ function start() {
       onPos: (list) => room.setPositions(list),
       onBall: ([x, y]) => room.setBall(x, y),
       onFx,
-      onGone: (why) => {
+      onGone(why) {
         store.del('cge-token');
         token = null;
         showJoin(why === 'kicked' ? 'You were removed from the room. Join again.' : 'Please join again.');
       },
-      onStatus: (ok) => ($('#conn').hidden = ok), // only shown when something is wrong
+      onStatus(ok) {
+        $('#conn').hidden = ok; // only shown when something is wrong
+      },
     },
   );
-  requestAnimationFrame(loop);
+  if (!looping) {
+    looping = true;
+    requestAnimationFrame(loop);
+  }
 }
 
 /** One-off events: someone reacted, the class levelled up, a trophy arrived. */
@@ -124,7 +130,7 @@ function onFx(ev) {
   }
 }
 
-// ---- keys: walking, reactions --------------------------------------------------------
+// ---- keys: walking, reactions, Escape to close modals --------------------------------
 
 const WALK_KEYS = ['arrowup', 'arrowdown', 'arrowleft', 'arrowright', 'w', 'a', 's', 'd'];
 const keys = new Set();
@@ -132,6 +138,11 @@ const keys = new Set();
 const typing = () => ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName) || !!document.activeElement?.isContentEditable;
 
 addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    panels.closeAll();
+    $('#result').hidden = true;
+    return;
+  }
   if (typing()) return;
   const k = e.key.toLowerCase();
   if (WALK_KEYS.includes(k)) {
@@ -153,11 +164,23 @@ addEventListener('blur', () => keys.clear());
 function sendEmote(e) {
   send('emote', { e }).catch(() => {});
 }
+
 EMOTES.forEach((em, i) => {
   const b = h('button', { type: 'button', title: `${em.label} (key ${i + 1})`, 'aria-label': em.label, 'data-e': em.id }, iconCanvas('emote', em.id, 2));
-  b.onclick = () => (sendEmote(em.id), b.blur());
+  b.onclick = () => {
+    sendEmote(em.id);
+    b.blur();
+  };
   $('#emotes').append(b);
 });
+
+// Touch-friendly Hop button for phones and tablets.
+const hopBtn = h('button', { type: 'button', class: 'hop-btn', title: 'Hop (Space)', 'aria-label': 'Hop', id: 'hop-btn' }, '↑');
+hopBtn.onclick = () => {
+  sendEmote('hop');
+  hopBtn.blur();
+};
+$('#emotes').append(hopBtn);
 
 $('#sound').onclick = () => {
   if (sound.on) sound.on = false;
@@ -184,12 +207,15 @@ $('#room').addEventListener('pointerdown', (e) => {
 
 // ---- E: use what is next to you ----------------------------------------------------------
 // A free chair (sit down), a trophy on the sill (read it), the open door (go through),
-// the class cat (pet it). The hint at the bottom of the screen says what E would do.
+// the coffee machine in free roam (grab coffee), the class cat (pet it).
 
 const near = (spot, reach) => Math.hypot(me.x - spot.x, me.y - spot.y) < reach;
 
 /** Is somebody else on this chair? */
-const taken = (seat) => [...room.players.values()].some((p) => p.meta.id !== state.me.id && p.online && Math.abs(p.x - seat.x) < 0.6 && Math.abs(p.y - seat.y) < 0.6);
+const taken = (seat) =>
+  [...room.players.values()].some(
+    (p) => p.meta.id !== state.me.id && p.online && Math.abs(p.x - seat.x) < 0.6 && Math.abs(p.y - seat.y) < 0.6,
+  );
 
 function sitOn(seat) {
   stopRoute();
@@ -203,18 +229,30 @@ function withinReach() {
 
   const seats = ROOMS[state.room].seats;
   const sitting = seats.some((seat) => seat.x === me.x && seat.y === me.y);
-  const chair = seats.filter((seat) => near(seat, 1.3) && !taken(seat)).sort((a, b) => Math.hypot(me.x - a.x, me.y - a.y) - Math.hypot(me.x - b.x, me.y - b.y))[0];
+  const chair = seats
+    .filter((seat) => near(seat, 1.3) && !taken(seat))
+    .sort((a, b) => Math.hypot(me.x - a.x, me.y - a.y) - Math.hypot(me.x - b.x, me.y - b.y))[0];
   if (chair && !sitting) return { label: 'sit down', use: () => sitOn(chair) };
 
-  const trophy = trophyNear(state.trophies.length, me.x, me.y);
-  if (trophy >= 0) return { label: `read “${state.trophies[trophy].name}”`, use: () => panels.openTrophies(trophy) };
+  const hits = trophiesNear(state.trophies.length, me.x, me.y);
+  if (hits.length) {
+    const label = hits.length > 1 ? `read ${hits.length} trophies here` : `read “${state.trophies[hits[0]].name}”`;
+    return { label, use: () => panels.openTrophies(hits) };
+  }
 
-  if (room.has('cat') && room.cat && near(room.cat, 1.5)) return { label: 'pet the cat', use: () => sendEmote('heart') };
+  if (state.room === BASE && state.mode === 'free' && near(ROOMS[BASE].coffeeSpot, 1.8)) {
+    return { label: 'grab coffee', use: () => sendEmote('drink') };
+  }
+
+  if (room.has('cat') && room.cat && near(room.cat, 1.5)) {
+    return { label: 'pet the cat', use: () => sendEmote('heart') };
+  }
   return null;
 }
 
 function updateHint() {
-  const text = withinReach()?.label ? `E · ${withinReach().label}` : '';
+  const hit = withinReach();
+  const text = hit ? `E · ${hit.label}` : '';
   const hint = $('#hint');
   if (hint.textContent !== text) hint.textContent = text;
   hint.hidden = !text;
@@ -243,7 +281,7 @@ function loop(t) {
     }
     if (dx || dy || locked || gone) stopRoute(); // the keys take over from a tap
     if (route.length) {
-      // head for the next spot on the route; drop it once we are there
+      // Head for the next spot on the route; drop it once we are there.
       dx = route[0].x - me.x;
       dy = route[0].y - me.y;
       if (Math.hypot(dx, dy) < WALK_SPEED * dt) {
@@ -280,10 +318,11 @@ function loop(t) {
 
 function layout() {
   const sheetEl = $('#sheet');
+  const top = Math.max(56, $('.hud').offsetHeight + 20); // the top bar can wrap onto two rows
+  document.documentElement.style.setProperty('--hud-h', `${top}px`);
   const docked = innerWidth >= 1000 && !sheetEl.hidden; // the sheet sits on the right (see student.css)
   const sheetH = sheetEl.hidden || docked ? 0 : sheetEl.offsetHeight + 16;
   const sheetW = docked ? sheetEl.offsetWidth + 20 : 0;
-  const top = Math.max(56, $('.hud').offsetHeight + 20); // the top bar wraps onto two rows on narrow screens
   const availW = innerWidth - 20 - sheetW;
   const availH = Math.max(160, innerHeight - top - sheetH - 8);
   room.fit(availW, availH);
@@ -306,7 +345,7 @@ let shownPoints = 0;
 
 function renderMe(meView) {
   const box = $('#me');
-  const made = `hat:${meView.hat}`;
+  const made = `${meView.name}|${meView.avatar}|${meView.hat}`;
   if (box.dataset.made !== made) {
     box.dataset.made = made;
     box.innerHTML = '';
@@ -338,6 +377,7 @@ function render() {
   renderMe(s.me);
   classBar($('#klass'), s.klass);
   $('#emotes [data-e="lost"]').setAttribute('aria-pressed', String(!!s.me.lost));
+  $('#hop-btn').hidden = s.mode === 'present';
   $('#mode').textContent = s.room === 'base' ? MODE_TEXT[s.mode] || s.mode : `${s.roomName} · ${MODE_TEXT[s.mode] || s.mode}`;
 
   frame.update(s, s.deckUrl);
@@ -368,8 +408,13 @@ function renderBanner() {
   } else if (state.spotlight) {
     banner.hidden = false;
     const you = state.spotlight.pid === state.me.id;
-    banner.append(you ? 'You are on the spot: tell the class about your answer.' : 'On the spot: ', you ? '' : h('b', {}, state.spotlight.name));
-  } else banner.hidden = true;
+    banner.append(
+      you ? 'You are on the spot: tell the class about your answer.' : 'On the spot: ',
+      you ? '' : h('b', {}, state.spotlight.name),
+    );
+  } else {
+    banner.hidden = true;
+  }
 }
 
 function tickCountdown() {
@@ -377,7 +422,12 @@ function tickCountdown() {
   const left = Math.max(0, Math.ceil((state.seatingEndsAt - state.serverNow - (performance.now() - renderedAt)) / 1000));
   const banner = $('#banner');
   banner.innerHTML = '';
-  banner.append('Take your seat! ', h('span', { class: 'countdown' }, left), h('br'), h('span', { class: 'quiet' }, "Walk onto any chair. When time runs out you'll be seated automatically."));
+  banner.append(
+    'Take your seat! ',
+    h('span', { class: 'countdown' }, left),
+    h('br'),
+    h('span', { class: 'quiet' }, "Walk onto any chair. When time runs out you'll be seated automatically."),
+  );
   countdownTimer = setTimeout(tickCountdown, 250);
 }
 
@@ -390,7 +440,9 @@ function tickDoor() {
 }
 
 // The soft timer on a question ticks between server updates.
-setInterval(() => state && sheet.tick(), 500);
+setInterval(() => {
+  if (state) sheet.tick();
+}, 500);
 
 // ---- go ------------------------------------------------------------------------------------
 

@@ -1,13 +1,11 @@
-// The teacher page: drive the slides, set the room's mode, run questions
-// (open → close → score → reveal), and keep an eye on the class.
+// The teacher page: drive the slides, set the room's mode, keep an eye on the class.
+// The live question, stats and scoring panel lives in teacher-question.js.
 
 import { $, h, post, connect, screenFrame, classBar, clock } from './common.js';
 import { CLASS_LEVELS } from './shared/fun.js';
 import { Room } from './room.js';
 import { avatarCanvas } from './sprites.js';
-import { LETTERS } from './shared/world.js';
-import { marksToHtml } from './shared/marks.js';
-import { isSet } from './shared/util.js';
+import { createQuestionPanel } from './teacher-question.js';
 
 const key = new URLSearchParams(location.search).get('key') || '';
 const withKey = (path) => `${path}?key=${encodeURIComponent(key)}`;
@@ -42,15 +40,28 @@ function alertBar(...content) {
 function gateBar(action, body, names) {
   const bar = alertBar(
     h('span', {}, `Still writing: ${names.join(', ')}. `),
-    h('button', { class: 'btn small hot', onclick: () => (bar.remove(), act(action, { ...body, force: true })) }, 'Move on anyway'),
+    h(
+      'button',
+      {
+        class: 'btn small hot',
+        onclick: () => {
+          bar.remove();
+          act(action, { ...body, force: true });
+        },
+      },
+      'Move on anyway',
+    ),
     h('button', { class: 'btn small', onclick: () => bar.remove() }, 'Wait'),
   );
 }
 
+const seatSeconds = () => Number($('#seat-s').value) || 20;
+const questionPanel = createQuestionPanel({ act, alertBar, seatSeconds });
+
 connect(
   { role: 'teacher', key },
   {
-    onState: (s) => {
+    onState(s) {
       state = s;
       room.setState(s);
       render();
@@ -59,38 +70,55 @@ connect(
     onBall: ([x, y]) => room.setBall(x, y),
     onFx: (ev) => room.fx(ev),
     onGone: () => alertBar('Wrong teacher key: use the link printed when the server started.'),
-    onStatus: (ok) => {
+    onStatus(ok) {
       $('#conn').textContent = ok ? 'live' : 'reconnecting…';
       $('#conn').style.color = ok ? 'var(--good)' : 'var(--warn)';
     },
   },
 );
+
 fetch('/api/info')
   .then((r) => r.json())
-  .then((info) => ($('#join-url').textContent = info.studentUrl));
+  .then((info) => {
+    $('#join-url').textContent = info.studentUrl;
+  });
 
 // ---- the fixed controls ----------------------------------------------------------------
 
-const seatSeconds = () => Number($('#seat-s').value) || 20;
 const go = (n) => act('slide', { slide: n });
 
 $('#open-screen').href = withKey('/screen');
 $('#report').href = `${withKey('/report')}&names`;
-document.querySelectorAll('[data-mode]').forEach((b) => (b.onclick = () => act('mode', { mode: b.dataset.mode })));
-$('#seat').onclick = (e) => e.target.tagName !== 'INPUT' && act('seat', { seconds: seatSeconds() });
-$('#share').onclick = () => $('#url').value.trim() && act('url', { url: $('#url').value.trim() });
+document.querySelectorAll('[data-mode]').forEach((b) => {
+  b.onclick = () => act('mode', { mode: b.dataset.mode });
+});
+$('#seat').onclick = (e) => {
+  if (e.target.tagName !== 'INPUT') act('seat', { seconds: seatSeconds() });
+};
+$('#share').onclick = () => {
+  const url = $('#url').value.trim();
+  if (url) act('url', { url });
+};
 $('#prev').onclick = () => go((state?.screen.slide || 1) - 1);
 $('#next').onclick = () => go((state?.screen.slide || 0) + 1);
 $('#cue').onclick = () => act('cue');
-$('#goto').addEventListener('keydown', (e) => e.key === 'Enter' && go(Number(e.target.value)));
+$('#goto').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') go(Number(e.target.value));
+});
 $('#finale').onclick = () => act('finale', { on: !state?.finale });
 $('#show-asks').onclick = () => act('show-asks', { on: !state?.showAsks });
 
 // Arrow keys and E drive the slides, like in the deck itself.
 addEventListener('keydown', (e) => {
   if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName)) return;
-  if (e.key === 'ArrowRight' || e.key === 'PageDown') (e.preventDefault(), $('#next').click());
-  if (e.key === 'ArrowLeft' || e.key === 'PageUp') (e.preventDefault(), $('#prev').click());
+  if (e.key === 'ArrowRight' || e.key === 'PageDown') {
+    e.preventDefault();
+    $('#next').click();
+  }
+  if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
+    e.preventDefault();
+    $('#prev').click();
+  }
   if (e.key.toLowerCase() === 'e') $('#cue').click();
 });
 
@@ -129,7 +157,7 @@ function render() {
   $('#lost').textContent = s.lost.length ? `? ${s.lost.length} lost: ${s.lost.join(', ')}` : '';
   renderRooms();
   renderSlides();
-  renderQuestion();
+  questionPanel.render(s);
   renderPlayers();
   renderBoard();
   renderAsks();
@@ -145,7 +173,13 @@ function renderRooms() {
   for (const r of s.rooms) {
     const here = r.id === s.room;
     const opening = s.door?.to === r.id;
-    box.append(h('button', { class: `btn small ${here ? 'on' : ''}`, disabled: here, onclick: () => act('room', { room: r.id }) }, opening ? `${r.name} (door open…)` : r.name));
+    box.append(
+      h(
+        'button',
+        { class: `btn small ${here ? 'on' : ''}`, disabled: here, onclick: () => act('room', { room: r.id }) },
+        opening ? `${r.name} (door open…)` : r.name,
+      ),
+    );
   }
 }
 
@@ -161,10 +195,15 @@ function renderSlides() {
     list.innerHTML = '';
     for (const slide of s.slides) {
       const kind = slide.mode === 'work' ? 'TASK ' : slide.mode === 'gate' ? 'BREAK ' : '';
-      const li = h('li', { 'data-n': slide.n, title: slide.title, onclick: () => go(slide.n) }, h('span', { class: 'n' }, slide.n), h('span', {}, h('span', { class: `k ${slide.mode}` }, kind), slide.title || slide.seg));
+      const li = h(
+        'li',
+        { 'data-n': slide.n, title: slide.title, onclick: () => go(slide.n) },
+        h('span', { class: 'n' }, slide.n),
+        h('span', {}, h('span', { class: `k ${slide.mode}` }, kind), slide.title || slide.seg),
+      );
       // Questions tied to this slide: one click shows the slide and opens the question.
       const questions = s.questions.filter((q) => q.slide === Number(slide.id));
-      if (questions.length)
+      if (questions.length) {
         li.append(
           h(
             'div',
@@ -175,10 +214,15 @@ function renderSlides() {
                 go(slide.n).then(() => act('open', { key: q.key }));
               };
               const look = q.status === 'revealed' ? 'go' : q.status ? 'gold' : '';
-              return h('button', { class: `btn small ${look}`, title: 'Show this slide and open the question', onclick: open }, `▶ ${q.title.split('·').pop().trim()}${q.answers ? ` (${q.answers})` : ''}`);
+              return h(
+                'button',
+                { class: `btn small ${look}`, title: 'Show this slide and open the question', onclick: open },
+                `▶ ${q.title.split('·').pop().trim()}${q.answers ? ` (${q.answers})` : ''}`,
+              );
             }),
           ),
         );
+      }
       list.append(li);
     }
   }
@@ -203,7 +247,22 @@ function renderPlayers() {
       const name = prompt(`New name for ${p.name}`, p.name);
       if (name) act('rename', { pid: p.id, name });
     };
-    const remove = () => confirm(`Remove ${p.name} from the room?`) && act('kick', { pid: p.id });
+    const remove = () => {
+      if (confirm(`Remove ${p.name} from the room?`)) act('kick', { pid: p.id });
+    };
+    const rejoin = !p.online
+      ? h(
+          'button',
+          {
+            class: `btn small ${p.rejoinOpen ? 'on' : ''}`,
+            title: p.rejoinOpen
+              ? 'Seat unlocked: student can rejoin with this exact name'
+              : 'Unlock seat so this student can rejoin from another browser without losing points',
+            onclick: () => act('allow-rejoin', { pid: p.id, on: !p.rejoinOpen }),
+          },
+          '↺',
+        )
+      : '';
     ul.append(
       h(
         'li',
@@ -211,6 +270,7 @@ function renderPlayers() {
         avatarCanvas(p.avatar, 1),
         h('span', { class: 'grow' }, p.name),
         h('span', { class: 'points' }, p.points),
+        rejoin,
         h('button', { class: 'btn small', title: 'Rename', onclick: rename }, '✎'),
         h('button', { class: 'btn small', title: 'Remove from the room', onclick: remove }, '×'),
       ),
@@ -222,8 +282,13 @@ function renderBoard() {
   const b = state.board;
   const el = $('#board');
   el.innerHTML = '';
-  el.append(h('strong', {}, 'Top 5'), h('ol', {}, b.top.map((p) => h('li', {}, `${p.name} · `, h('span', { class: 'points' }, p.points)))));
-  if (b.improved.length) el.append(h('strong', {}, 'Improved'), h('ul', {}, b.improved.map((p) => h('li', {}, `${p.name} ×${p.improved}`))));
+  el.append(
+    h('strong', {}, 'Top 5'),
+    h('ol', {}, b.top.map((p) => h('li', {}, `${p.name} · `, h('span', { class: 'points' }, p.points)))),
+  );
+  if (b.improved.length) {
+    el.append(h('strong', {}, 'Improved'), h('ul', {}, b.improved.map((p) => h('li', {}, `${p.name} ×${p.improved}`))));
+  }
 }
 
 /** Questions students asked. Held ones did not look like a question: post or dismiss them. */
@@ -234,15 +299,28 @@ function renderAsks() {
   const ul = $('#asks');
   ul.innerHTML = '';
   if (!s.asks.length) ul.append(h('li', { class: 'quiet' }, 'None yet. Students ask with the Ask button.'));
-  const status = (it, to, label, title) => h('button', { class: 'btn small', title, onclick: () => act('ask-status', { id: it.id, status: to }) }, label);
+  const status = (it, to, label, title) =>
+    h('button', { class: 'btn small', title, onclick: () => act('ask-status', { id: it.id, status: to }) }, label);
   for (const it of [...s.asks].sort((a, b) => b.votes - a.votes)) {
     const held = it.status === 'held';
     ul.append(
       h(
         'li',
         { class: held ? 'held' : '' },
-        h('div', {}, held ? h('span', { class: 'chip warn' }, 'held') : h('span', { class: 'chip good' }, `▲ ${it.votes}`), it.text, h('span', { class: 'quiet' }, ` · ${it.name}`)),
-        h('div', { class: 'row' }, held ? status(it, 'posted', 'Post', 'Put it on the board') : status(it, 'answered', 'Answered', 'Take it off the board'), status(it, 'hidden', held ? 'Dismiss' : 'Hide', 'Remove it')),
+        h(
+          'div',
+          {},
+          held ? h('span', { class: 'chip warn' }, 'held') : h('span', { class: 'chip good' }, `▲ ${it.votes}`),
+          it.slide ? h('span', { class: 'chip info' }, `s${it.slide}`) : '',
+          it.text,
+          h('span', { class: 'quiet' }, ` · ${it.name}`),
+        ),
+        h(
+          'div',
+          { class: 'row' },
+          held ? status(it, 'posted', 'Post', 'Put it on the board') : status(it, 'answered', 'Answered', 'Take it off the board'),
+          status(it, 'hidden', held ? 'Dismiss' : 'Hide', 'Remove it'),
+        ),
       ),
     );
   }
@@ -256,202 +334,25 @@ function renderGoal() {
   // Concept trophies of this lesson: earned at a reveal, or awarded by hand.
   const box = $('#trophies');
   box.innerHTML = '';
-  for (const t of s.lessonTrophies)
-    box.append(h('li', {}, h('span', { class: 'grow' }, t.name), t.earned ? h('span', { class: 'chip good' }, 'on the shelf') : h('button', { class: 'btn small', title: t.after ? `Earned when “${t.after}” is revealed, or now` : 'Award it now', onclick: () => act('trophy', { id: t.id }) }, 'Award')));
-  $('#trophies-box').hidden = !s.lessonTrophies.length;
-}
-
-// ---- the question panel ----------------------------------------------------------------------
-
-function renderQuestion() {
-  const box = $('#question');
-  const q = state.question;
-  if (box.contains(document.activeElement) && ['TEXTAREA', 'INPUT', 'SELECT'].includes(document.activeElement.tagName)) {
-    // Don't wipe what the teacher is typing: only the counter moves.
-    if ($('#q-count') && q) $('#q-count').textContent = `${q.submitted}/${q.online}`;
-    return;
-  }
-  box.innerHTML = '';
-  const onThisSlide = state.questions.filter((x) => x.slide === state.screen.slide);
-  if ((!q || q.status === 'revealed') && onThisSlide.length) box.append(h('strong', {}, `Questions on slide ${state.screen.slide}`), questionList(onThisSlide));
-  box.append(q ? liveQuestion(q) : h('p', { class: 'quiet' }, 'No question open. Pick one from the slide list, this slide, or ask one now.'));
-  box.append(h('details', {}, h('summary', {}, `All lesson questions (${state.questions.length})`), questionList(state.questions)), quickQuestion());
-}
-
-function questionList(questions) {
-  return h(
-    'ul',
-    { class: 'qlist' },
-    questions.map((q) =>
+  for (const t of s.lessonTrophies) {
+    box.append(
       h(
         'li',
         {},
-        h('span', { class: 'quiet' }, q.slide ? `s${q.slide}` : ''),
-        h('span', { class: 'grow' }, q.title),
-        q.status ? h('span', { class: 'chip info' }, `${q.status} · ${q.answers}`) : '',
-        h('button', { class: 'btn small go', onclick: () => act('open', { key: q.key }) }, q.status ? 'Reopen' : 'Open'),
-      ),
-    ),
-  );
-}
-
-/** A question typed on the spot: written, zones (a poll), or an opinion line. */
-function quickQuestion() {
-  const prompt = h('input', { type: 'text', placeholder: 'Ask a quick question now…' });
-  const kind = h('select', {}, h('option', { value: 'text' }, 'Written answer'), h('option', { value: 'choice' }, 'Zones (a poll)'), h('option', { value: 'line' }, 'Opinion line'));
-  const extra = h('input', { type: 'text', hidden: true });
-  kind.onchange = () => {
-    extra.hidden = kind.value === 'text';
-    extra.placeholder = kind.value === 'choice' ? 'Options, separated by |' : 'The two ends, separated by |  (default: Disagree | Agree)';
-  };
-  const ask = () => {
-    const text = prompt.value.trim();
-    if (!text) return;
-    const list = extra.value.split('|').map((x) => x.trim()).filter(Boolean);
-    const def = { kind: kind.value, title: 'Quick question', prompt: text, scored: false };
-    if (kind.value === 'choice') Object.assign(def, { options: list, correct: null });
-    if (kind.value === 'line') def.labels = list;
-    if (kind.value === 'choice' && list.length < 2) return alertBar('Give at least two options, separated by |');
-    act('open', { def });
-  };
-  return h('details', {}, h('summary', {}, 'Ask a quick question'), h('div', { class: 'row' }, prompt), h('div', { class: 'row' }, kind, extra, h('button', { class: 'btn', onclick: ask }, 'Ask')));
-}
-
-function liveQuestion(q) {
-  const s = state;
-  const wrap = h('div');
-  wrap.append(
-    h('div', { class: 'qhead' }, h('h2', {}, q.title), h('span', { class: 'chip info' }, q.status), h('span', { class: 'big-count', id: 'q-count' }, `${q.submitted}/${q.online}`), h('span', { class: 'quiet' }, 'handed in'), h('span', { class: 'quiet', id: 'q-elapsed' })),
-  );
-  const open = q.status === 'open';
-  const writing = q.waitingFor.length;
-  if (open && writing) wrap.append(h('p', { class: 'waiting' }, `Waiting for: ${q.waitingFor.join(', ')}`));
-  if (open && !writing && q.online > 0) wrap.append(h('p', { class: 'ok' }, 'Everyone is in. You can close.'));
-  if (q.fullHouse) wrap.append(h('p', { class: 'ok' }, 'Everyone handed in: +10 each at the reveal.'));
-
-  const row = h('div', { class: 'row' });
-  // The submit gate: closing early is possible, but it has to be said out loud.
-  if (open && writing) row.append(h('button', { class: 'btn hot', onclick: () => act('close', { force: true }) }, `Close anyway (${writing} still writing)`));
-  if (open && !writing) row.append(h('button', { class: 'btn go', onclick: () => act('close') }, 'Close'));
-  if (!open && q.needsAi) {
-    const label = s.scoring ? `Scoring with ${s.aiMode}…` : q.status === 'revealed' ? 'Score retries' : `Suggest scores (${s.aiMode})`;
-    row.append(h('button', { class: 'btn gold', disabled: s.scoring, onclick: () => act('score') }, label));
-  }
-  if (!open) row.append(h('button', { class: 'btn go', onclick: () => act('reveal') }, q.status === 'revealed' ? 'Reveal again' : 'Reveal to everyone'));
-  if (q.status === 'revealed' && q.hasExample) row.append(h('button', { class: `btn ${q.exampleShown ? 'on' : ''}`, title: 'Put the sound answer from the lesson on the projector', onclick: () => act('example', { on: !q.exampleShown }) }, 'Show a sound answer'));
-  if (s.answers.length) row.append(h('button', { class: 'btn', title: 'Put a random student on the spot, with their answer on the projector', onclick: () => act('pick') }, 'Pick someone'));
-  if (s.spotlight) row.append(h('button', { class: 'btn', onclick: () => act('spotlight', { pid: null }) }, `Clear spotlight (${s.spotlight.name})`));
-  if (open) {
-    // a soft countdown on every screen; nothing closes by itself
-    row.append(h('span', { class: 'quiet' }, 'Timer'));
-    for (const m of [1, 2, 3, 5]) row.append(h('button', { class: 'btn small', title: `Show a ${m} minute countdown`, onclick: () => act('timer', { seconds: m * 60 }) }, `${m}m`));
-    if (q.timerEndsAt) row.append(h('button', { class: 'btn small', onclick: () => act('timer', { seconds: 0 }) }, 'off'));
-  }
-  row.append(h('button', { class: 'btn small', onclick: () => act('seat', { seconds: seatSeconds() }) }, 'Back to seats'));
-  wrap.append(row);
-
-  if (q.scoringError) wrap.append(h('p', { class: 'err' }, `Scoring failed: ${q.scoringError}. You can score by hand below, or try again.`));
-  if (q.missed.length) wrap.append(h('p', { class: 'missed' }, 'Missed most: ', q.missed.slice(0, 4).map((m) => h('span', { class: 'chip warn' }, `${m.concept} ×${m.n}`))));
-  wrap.append(statsView(q));
-
-  const picks = s.picks || { good: [], check: [] };
-  wrap.append(h('ul', { class: 'answers' }, s.answers.map((a) => answerItem(q, a, picks))));
-  return wrap;
-}
-
-/** How the class answered: a bar per option, per grid row, or along the opinion line. */
-function statsView(q) {
-  const box = h('div', { class: 'stats' });
-  const bar = (n, of) => h('span', { class: 'bar', style: `width:${(n / Math.max(1, of)) * 120}px` });
-  if (q.kind === 'choice') {
-    const total = q.counts.reduce((x, y) => x + y, 0);
-    const correct = isSet(q.correct) ? [].concat(q.correct) : [];
-    q.order.forEach((opt, pos) => box.append(h('div', {}, h('b', {}, `${LETTERS[pos]} `), correct.includes(opt) ? h('span', { class: 'ok' }, '✓ ') : '', `${q.options[opt].slice(0, 70)} · ${q.counts[opt]}`, bar(q.counts[opt], total))));
-  }
-  if (q.kind === 'grid')
-    q.rows.forEach((row, i) => {
-      const right = q.rowCorrect[i] || [];
-      box.append(h('div', {}, `${i + 1}. ${row.text.slice(0, 60)} → `, (row.options || q.options).map((o, j) => h('span', { class: right.includes(j) ? 'ok' : '' }, `${o}: ${q.rowStats[i][j]}  `))));
-    });
-  if (q.kind === 'bug')
-    box.append(
-      h(
-        'ol',
-        { class: 'code-lines' },
-        q.code.split('\n').map((line, i) => h('li', { class: q.correctLines.includes(i + 1) ? 'right' : '' }, h('code', {}, line || ' '), q.lineCounts[i] ? h('b', {}, ` ← ${q.lineCounts[i]}`) : '')),
-      ),
-    );
-  if (q.kind === 'code') q.tests.forEach((test, i) => box.append(h('div', {}, `${test.name} · ${q.passCounts[i]} pass`, bar(q.passCounts[i], q.submitted))));
-  if (q.kind === 'line') {
-    const total = q.spread.reduce((x, y) => x + y, 0);
-    box.append(h('div', {}, `${q.labels[0]} ◀ `, q.spread.map((n) => h('span', {}, bar(n, total), ` ${n} `)), `▶ ${q.labels[1]}`, isSet(q.average) ? ` · average ${q.average}/100` : ''));
-  }
-  return box;
-}
-
-/** One student's answer: what they wrote, the flags, and the 0–3 score with its feedback. */
-function answerItem(q, a, picks) {
-  const def = q.def;
-  const good = picks.good.includes(a.pid);
-  const check = picks.check.includes(a.pid);
-  const li = h('li', { class: `answer ${good ? 'pick-good' : ''} ${check ? 'pick-check' : ''}` });
-  const onSpot = state.spotlight?.pid === a.pid;
-  li.append(
-    h(
-      'div',
-      { class: 'who' },
-      h('span', {}, a.name),
-      a.attempt > 1 ? h('span', { class: 'chip good' }, `retry ${a.attempt}`) : '',
-      good ? h('span', { class: 'chip good' }, 'worth showing') : '',
-      h('span', { class: 'grow' }),
-      isSet(a.points) ? h('span', { class: 'points' }, `${a.points} pts`) : '',
-      h('button', { class: `btn small ${onSpot ? 'on' : ''}`, title: 'Put this answer on the projector; the student walks to the front', onclick: () => act('spotlight', { pid: onSpot ? null : a.pid }) }, 'Spotlight'),
-    ),
-  );
-
-  const tick = (ok) => (ok === true ? h('span', { class: 'ok' }, ' ✓') : ok === false ? h('span', { class: 'no' }, ' ✗') : '');
-  const body = h('div', { class: 'body' });
-  if (def.kind === 'choice' && isSet(a.choice)) {
-    const verdict = a.auto?.choice === 'partial' ? ' ½' : tick({ right: true, wrong: false }[a.auto?.choice]);
-    body.append(h('div', {}, h('b', {}, LETTERS[q.order.indexOf(a.choice)]), ` ${def.options[a.choice].slice(0, 90)}`, verdict));
-    if (def.reasons && isSet(a.reason)) body.append(h('div', { class: 'quiet' }, `Reason: ${def.reasons.options[a.reason]}`, tick(a.auto?.reason)));
-  }
-  if (def.kind === 'grid' && a.grid)
-    body.append(
-      h(
-        'div',
-        {},
-        a.grid.map((picked, i) => {
-          const ok = a.auto?.rows?.[i];
-          const label = picked === null ? '—' : (def.rows[i].options || def.options)[picked].split(' ')[0];
-          return h('span', { class: ok === true ? 'ok' : ok === false ? 'no' : '' }, `${i + 1}:${label}  `);
-        }),
-      ),
-    );
-  if (def.kind === 'line' && isSet(a.value)) body.append(h('div', {}, `Stands at ${a.value}/100`));
-  if (def.kind === 'bug') body.append(h('div', {}, `Line ${a.line}`, tick({ right: true, wrong: false }[a.auto?.choice]), h('span', { class: 'quiet' }, ` · after ${clock(a.took)}`)));
-  if (def.kind === 'code') {
-    // The checks ran in the student's browser: read the code before trusting the ticks.
-    body.append(h('pre', { class: 'code' }, a.text), h('div', {}, def.tests.map((test, i) => h('span', { class: a.passed?.[i] ? 'ok' : 'no' }, `${a.passed?.[i] ? '✓' : '✗'} ${test.name}  `))));
-  } else if (a.text) body.append(h('div', { html: marksToHtml(a.text) }));
-  li.append(body);
-  if (a.flags.length) li.append(h('div', {}, a.flags.map((f) => h('span', { class: `chip ${f.level}` }, f.label))));
-
-  if (q.needsAi) {
-    const ai = a.ai || {};
-    const feedback = h('textarea', { placeholder: 'Feedback to the student (optional)' });
-    feedback.value = ai.feedback || '';
-    const setScore = (score) => act('set-score', { pid: a.pid, score, feedback: feedback.value });
-    feedback.addEventListener('change', () => setScore(ai.score ?? 0));
-    const by = !a.ai ? 'Not scored yet' : ai.edited ? 'Your score' : `Suggested by ${ai.by}`;
-    li.append(
-      h(
-        'div',
-        { class: 'ai' },
-        h('div', { class: 'row' }, h('span', { class: 'quiet' }, by), h('span', { class: 'scorebtns' }, [0, 1, 2, 3].map((n) => h('button', { class: `btn small ${ai.score === n ? 'on' : ''}`, onclick: () => setScore(n) }, n))), ai.missed ? h('span', { class: 'chip warn' }, `missed: ${ai.missed}`) : ''),
-        feedback,
+        h('span', { class: 'grow' }, t.name),
+        t.earned
+          ? h('span', { class: 'chip good' }, 'on the shelf')
+          : h(
+              'button',
+              {
+                class: 'btn small',
+                title: t.after ? `Earned when “${t.after}” is revealed, or now` : 'Award it now',
+                onclick: () => act('trophy', { id: t.id }),
+              },
+              'Award',
+            ),
       ),
     );
   }
-  return li;
+  $('#trophies-box').hidden = !s.lessonTrophies.length;
 }

@@ -1,11 +1,12 @@
 // The projector view: the room, the shared screen, and the big moments
 // (countdowns, the hand-in counter, results and the spotlight).
 
-import { $, h, post, connect, screenFrame, placeFrame, sound, countTo, bump, celebrate, clock, classBar } from './common.js';
+import { $, h, post, connect, screenFrame, placeFrame, sound, countTo, bump, celebrate, clock, classBar, toast } from './common.js';
 import { Room, ROOM_SIZE } from './room.js';
 import { avatarCanvas } from './sprites.js';
 import { LETTERS } from './shared/world.js';
 import { marksToHtml } from './shared/marks.js';
+import { qrCanvas } from './qr.js';
 
 const key = new URLSearchParams(location.search).get('key') || '';
 const room = new Room($('#room'));
@@ -17,7 +18,11 @@ let renderedAt = performance.now();
 
 fetch('/api/info')
   .then((r) => r.json())
-  .then((i) => ($('#join-url').textContent = i.studentUrl));
+  .then((info) => {
+    $('#join-url').textContent = info.studentUrl;
+    const qr = qrCanvas(info.studentUrl, 3);
+    if (qr) $('#join-qr').replaceChildren(qr);
+  });
 
 $('#sound').onclick = () => {
   if (sound.on) sound.on = false;
@@ -35,7 +40,7 @@ addEventListener('keydown', (e) => {
 connect(
   { role: 'screen', key },
   {
-    onState: (s) => {
+    onState(s) {
       state = s;
       renderedAt = performance.now();
       room.setState(s);
@@ -43,7 +48,7 @@ connect(
     },
     onPos: (list) => room.setPositions(list),
     onBall: ([x, y]) => room.setBall(x, y),
-    onFx: (ev) => {
+    onFx(ev) {
       room.fx(ev);
       if (ev.t === 'level') bigNews(`Class level ${ev.level}!`, ev.text, { count: 200, ms: 4000 });
       if (ev.t === 'trophy') bigNews(`New trophy: ${ev.name}`, ev.text, { count: 120, ms: 3000 });
@@ -65,7 +70,11 @@ addEventListener('message', (e) => {
   const message = e.data;
   if (e.source !== $('#screen').contentWindow || message?.type !== 'cge:command' || !state?.screen.slide) return;
   const body = DECK_COMMANDS[message.action]?.(message);
-  if (body) post(`/api/teacher/${message.action}?key=${encodeURIComponent(key)}`, body).catch(() => {});
+  if (body) {
+    post(`/api/teacher/${message.action}?key=${encodeURIComponent(key)}`, body).catch((err) => {
+      if (err.data?.gate) toast('Students are still writing — override from the teacher screen.');
+    });
+  }
 });
 
 /** The class earned something (a room reward, a trophy): say it big, for a few seconds. */
@@ -78,7 +87,9 @@ function bigNews(title, text, confetti) {
   celebrate(confetti);
   sound.tune('level');
   clearTimeout(newsTimer);
-  newsTimer = setTimeout(() => (box.hidden = true), 6000);
+  newsTimer = setTimeout(() => {
+    box.hidden = true;
+  }, 6000);
 }
 
 function layout() {
@@ -135,7 +146,10 @@ let timeUp = false;
 setInterval(() => {
   const q = state?.question;
   const el = $('#qtimer');
-  if (!el || !q?.timerEndsAt) return (timeUp = false);
+  if (!el || !q?.timerEndsAt) {
+    timeUp = false;
+    return;
+  }
   const left = q.timerEndsAt - (Date.now() + room.skew);
   el.textContent = left > 0 ? clock(left) : "time's up";
   el.classList.toggle('low', left < 15000);
@@ -161,14 +175,44 @@ function renderFinale() {
   const place = (p, n) => {
     if (!p) return '';
     const pts = h('span', { class: 'points' }, first ? '0' : String(p.points));
-    if (first) setTimeout(() => countTo(pts, 0, p.points, 900).then(() => bump(pts)), n === 1 ? 1500 : n === 2 ? 900 : 300);
-    return h('div', { class: `place p${n}` }, avatarCanvas(p.avatar, 5, { hat: p.hat, reserveHat: true }), h('b', {}, p.name), pts, h('div', { class: 'step' }, n));
+    if (first) {
+      setTimeout(
+        () => countTo(pts, 0, p.points, 900).then(() => bump(pts)),
+        n === 1 ? 1500 : n === 2 ? 900 : 300,
+      );
+    }
+    return h(
+      'div',
+      { class: `place p${n}` },
+      avatarCanvas(p.avatar, 5, { hat: p.hat, reserveHat: true }),
+      h('b', {}, p.name),
+      pts,
+      h('div', { class: 'step' }, n),
+    );
   };
   const who = (p, extra = '') => h('div', { class: 'who' }, avatarCanvas(p.avatar, 1.5), `${p.name}${extra}`);
   const awards = h('div', { class: 'awards' });
-  if (f.improved.length) awards.append(h('div', { class: 'award panel' }, h('h3', {}, 'Improved today'), h('div', { class: 'names' }, f.improved.map((p) => who(p, p.improved > 1 ? ` ×${p.improved}` : '')))));
-  if (f.streak.n >= 2)
-    awards.append(h('div', { class: 'award panel' }, h('h3', {}, `Handed in ${f.streak.n} in a row`), h('div', { class: 'names' }, f.streak.players.map((p) => who(p))), f.streak.more ? h('div', { class: 'quiet' }, `and ${f.streak.more} more`) : ''));
+  if (f.improved.length) {
+    awards.append(
+      h(
+        'div',
+        { class: 'award panel' },
+        h('h3', {}, 'Improved today'),
+        h('div', { class: 'names' }, f.improved.map((p) => who(p, p.improved > 1 ? ` ×${p.improved}` : ''))),
+      ),
+    );
+  }
+  if (f.streak.n >= 2) {
+    awards.append(
+      h(
+        'div',
+        { class: 'award panel' },
+        h('h3', {}, `Handed in ${f.streak.n} in a row`),
+        h('div', { class: 'names' }, f.streak.players.map((p) => who(p))),
+        f.streak.more ? h('div', { class: 'quiet' }, `and ${f.streak.more} more`) : '',
+      ),
+    );
+  }
   const k = state.klass;
   box.append(
     h(
@@ -194,7 +238,10 @@ function tick() {
   const left = Math.max(0, Math.ceil((endsAt - state.serverNow - (performance.now() - renderedAt)) / 1000));
   const banner = $('#banner');
   banner.innerHTML = '';
-  banner.append(state.door ? `The door is open: off to the ${state.door.name.toLowerCase()}! ` : 'Take your seat! ', h('span', { class: 'countdown' }, left));
+  banner.append(
+    state.door ? `The door is open: off to the ${state.door.name.toLowerCase()}! ` : 'Take your seat! ',
+    h('span', { class: 'countdown' }, left),
+  );
   if (left <= 3 && left > 0) sound.blip(left * 2);
   timer = setTimeout(tick, 1000);
 }
@@ -212,7 +259,7 @@ function renderQbar() {
   bar.hidden = false;
   const allIn = q.status === 'open' && q.online > 0 && q.submitted >= q.online;
   if (allIn && !wasAllIn) {
-    // the whole room handed in: a small party, and the team bonus is theirs
+    // The whole room handed in: a small party, and the team bonus is theirs.
     celebrate({ count: 90, ms: 2200 });
     sound.tune('allin');
   }
@@ -221,7 +268,13 @@ function renderQbar() {
   bar.innerHTML = '';
   bar.append(
     h('div', { class: 'text' }, h('h2', {}, q.title), h('p', {}, q.prompt)),
-    h('div', { class: `count ${allIn ? 'all-in' : ''}` }, h('span', { id: 'qcount' }, `${q.submitted}/${q.online}`), h('small', {}, status), q.timerEndsAt ? h('span', { class: 'timer', id: 'qtimer' }) : ''),
+    h(
+      'div',
+      { class: `count ${allIn ? 'all-in' : ''}` },
+      h('span', { id: 'qcount' }, `${q.submitted}/${q.online}`),
+      h('small', {}, status),
+      q.timerEndsAt ? h('span', { class: 'timer', id: 'qtimer' }) : '',
+    ),
   );
   if (q.submitted !== lastCount) {
     if (lastCount >= 0) {
@@ -242,7 +295,7 @@ function renderWall() {
     wallSig = '';
     return;
   }
-  const sig = JSON.stringify([q.key, q.wall?.map((w) => w.points), q.example]);
+  const sig = JSON.stringify([q.key, q.wallNames, q.wall?.map((w) => [w.name, w.points]), q.example]);
   if (sig === wallSig) return;
   wallSig = sig;
   wall.hidden = false;
@@ -252,7 +305,7 @@ function renderWall() {
   if (q.kind === 'choice' && q.counts) {
     const total = Math.max(1, q.counts.reduce((a, b) => a + b, 0));
     const correct = q.correct === null || q.correct === undefined ? [] : [].concat(q.correct);
-    q.order.forEach((opt, pos) =>
+    q.order.forEach((opt, pos) => {
       wall.append(
         h(
           'div',
@@ -262,10 +315,10 @@ function renderWall() {
           `${q.counts[opt]}  ${correct.includes(opt) ? '✓' : ''}`,
           h('div', { class: 'quiet' }, q.options[opt]),
         ),
-      ),
-    );
+      );
+    });
   }
-  if (q.kind === 'grid' && q.rowStats)
+  if (q.kind === 'grid' && q.rowStats) {
     q.rows.forEach((r, i) => {
       const opts = r.options || q.options;
       const right = q.rowCorrect[i] || [];
@@ -274,51 +327,84 @@ function renderWall() {
           'div',
           { class: 'stat' },
           h('div', {}, `${i + 1}. ${r.text}`),
-          opts.map((o, j) => h('div', { class: right.includes(j) ? 'stat right' : 'stat' }, h('span', { class: 'bar', style: `width:${q.rowStats[i][j] * 12}px` }), `${o}: ${q.rowStats[i][j]} ${right.includes(j) ? '✓' : ''}`)),
+          opts.map((o, j) =>
+            h(
+              'div',
+              { class: right.includes(j) ? 'stat right' : 'stat' },
+              h('span', { class: 'bar', style: `width:${q.rowStats[i][j] * 12}px` }),
+              `${o}: ${q.rowStats[i][j]} ${right.includes(j) ? '✓' : ''}`,
+            ),
+          ),
         ),
       );
     });
+  }
 
-  if (q.kind === 'bug')
+  if (q.kind === 'bug') {
     wall.append(
       h(
         'ol',
         { class: 'code-lines' },
-        q.code.split('\n').map((line, i) => h('li', { class: q.correctLines.includes(i + 1) ? 'right' : '' }, h('code', {}, line || ' '), q.lineCounts[i] ? h('b', {}, `  ← ${q.lineCounts[i]}`) : '')),
+        q.code.split('\n').map((line, i) =>
+          h('li', { class: q.correctLines.includes(i + 1) ? 'right' : '' }, h('code', {}, line || ' '), q.lineCounts[i] ? h('b', {}, `  ← ${q.lineCounts[i]}`) : ''),
+        ),
       ),
     );
-  if (q.kind === 'code') q.tests.forEach((test, i) => wall.append(h('div', { class: 'stat right' }, h('span', { class: 'bar', style: `width:${(q.passCounts[i] / Math.max(1, q.submitted)) * 200}px` }), `${q.passCounts[i]} pass · ${test.name}`)));
+  }
+  if (q.kind === 'code') {
+    q.tests.forEach((test, i) => {
+      wall.append(
+        h(
+          'div',
+          { class: 'stat right' },
+          h('span', { class: 'bar', style: `width:${(q.passCounts[i] / Math.max(1, q.submitted)) * 200}px` }),
+          `${q.passCounts[i]} pass · ${test.name}`,
+        ),
+      );
+    });
+  }
   if (q.kind === 'line') {
     const most = Math.max(1, ...q.spread);
     wall.append(
       h('div', { class: 'stat' }, h('b', {}, `${q.labels[0]} ◀ … ▶ ${q.labels[1]}`)),
-      ...q.spread.map((n, i) => h('div', { class: 'stat' }, h('span', { class: 'quiet' }, `${i * 20}–${i * 20 + 20} `), h('span', { class: 'bar', style: `width:${(n / most) * 200}px` }), String(n))),
+      ...q.spread.map((n, i) =>
+        h('div', { class: 'stat' }, h('span', { class: 'quiet' }, `${i * 20}–${i * 20 + 20} `), h('span', { class: 'bar', style: `width:${(n / most) * 200}px` }), String(n)),
+      ),
     );
   }
-  if (q.example) wall.append(h('div', { class: 'card example' }, h('div', { class: 'who' }, 'One sound answer'), h('div', {}, q.example)));
+  if (q.example) {
+    wall.append(h('div', { class: 'card example' }, h('div', { class: 'who' }, 'One sound answer'), h('div', {}, q.example)));
+  }
 
   const hasText = (q.wall || []).some((w) => w.text);
-  let i = 0;
-  for (const w of q.wall || []) {
-    if (q.kind === 'line' || q.kind === 'bug') break; // the floor, or the code above, is the result
-    if (!hasText && i >= 8) break;
+  const cards = q.kind === 'line' || q.kind === 'bug' ? [] : hasText ? q.wall || [] : (q.wall || []).slice(0, 8);
+  cards.forEach((w, idx) => {
     const pts = h('span', { class: 'points' }, '0');
-    const card = h(
+    const who = h(
       'div',
-      { class: 'card' },
-      h('div', { class: 'who' }, avatarCanvas(w.avatar, 1.5), h('span', { class: 'grow' }, w.name), w.improved ? h('span', { class: 'improved-badge' }, 'IMPROVED') : '', pts),
-      w.text ? (q.kind === 'code' ? h('pre', { class: 'code' }, w.text) : h('div', { html: marksToHtml(w.text) })) : '',
+      { class: 'who' },
+      w.avatar !== null && w.avatar !== undefined ? avatarCanvas(w.avatar, 1.5) : '',
+      h('span', { class: 'grow' }, w.name || `Answer #${idx + 1}`),
+      w.improved ? h('span', { class: 'improved-badge' }, 'IMPROVED') : '',
+      pts,
     );
-    wall.append(card);
-    setTimeout(() => countTo(pts, 0, w.points, 600).then(() => (bump(pts), sound.blip(5 + (i % 7)))), 200 + i * 180);
-    i++;
-  }
+    const body = w.text ? (q.kind === 'code' ? h('pre', { class: 'code' }, w.text) : h('div', { html: marksToHtml(w.text) })) : '';
+    wall.append(h('div', { class: 'card' }, who, body));
+    setTimeout(() => {
+      countTo(pts, 0, w.points, 600).then(() => {
+        bump(pts);
+        sound.blip(5 + (idx % 7));
+      });
+    }, 200 + idx * 180);
+  });
 
   board.hidden = false;
   board.innerHTML = '';
   const b = state.board;
   board.append(h('h3', {}, 'Top 5'), h('ol', {}, b.top.map((p) => h('li', {}, `${p.name} `, h('span', { class: 'points' }, p.points)))));
-  if (b.improved.length) board.append(h('h3', {}, 'Improved today'), h('ul', {}, b.improved.map((p) => h('li', {}, `${p.name} ×${p.improved}`))));
+  if (b.improved.length) {
+    board.append(h('h3', {}, 'Improved today'), h('ul', {}, b.improved.map((p) => h('li', {}, `${p.name} ×${p.improved}`))));
+  }
   if (q.fullHouse) board.append(h('p', { class: 'ok' }, 'Everyone handed in: +10 each'));
   const bar = h('div', { class: 'classbar' });
   board.append(bar);
@@ -351,6 +437,19 @@ function renderAsks() {
   box.innerHTML = '';
   box.append(
     h('h2', {}, 'Your questions'),
-    asks.length ? h('ol', {}, asks.map((it) => h('li', {}, h('span', { class: 'votes' }, `▲ ${it.votes}`), h('div', {}, it.text, h('div', { class: 'who' }, it.name))))) : h('p', { class: 'quiet' }, 'No questions yet. Use the Ask button on your screen.'),
+    asks.length
+      ? h(
+          'ol',
+          {},
+          asks.map((it) =>
+            h(
+              'li',
+              {},
+              h('span', { class: 'votes' }, `▲ ${it.votes}`),
+              h('div', {}, it.text, h('div', { class: 'who' }, `${it.name}${it.slide ? ` · slide ${it.slide}` : ''}`)),
+            ),
+          ),
+        )
+      : h('p', { class: 'quiet' }, 'No questions yet. Use the Ask button on your screen.'),
   );
 }
