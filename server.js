@@ -77,12 +77,14 @@ const TEACHER_ACTIONS = {
   'set-score': (game, b) => game.setScore(b.pid, b.score, b.feedback),
   reveal: (game, b) => game.reveal({ force: b.force }),
   example: (game, b) => game.showExample(b.on !== false),
+  'wall-names': (game, b) => game.setWallNames(b.on !== false),
   spotlight: (game, b) => game.setSpotlight(b.pid || null),
   pick: (game) => game.pickSpotlight(),
   // the questions board, trophies, players
   'ask-status': (game, b) => game.moderateAsk(b.id, b.status),
   'show-asks': (game, b) => game.setShowAsks(b.on !== false),
   trophy: (game, b) => game.awardTrophy(b.id),
+  'allow-rejoin': (game, b) => game.allowRejoin(b.pid, b.on !== false),
   kick: (game, b) => game.kick(b.pid),
   rename: (game, b) => game.rename(b.pid, b.name),
 };
