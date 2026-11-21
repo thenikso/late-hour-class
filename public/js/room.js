@@ -7,9 +7,9 @@
 //      one stands on), so whoever is further down the screen is in front.
 //   3. labels (names, zone letters, points) at screen resolution, so text stays sharp.
 
-import { TILE, COLS, ROWS, SCREEN, FLOOR, TROPHY_SLOTS, zones, LETTERS } from './world.js';
-import { ROOMS, BASE, DOOR, FEET, thingsIn, seatAt } from './rooms.js';
-import { findPath } from './path.js';
+import { TILE, COLS, ROWS, SCREEN, FLOOR, TROPHY_SLOTS, zones, LETTERS } from './shared/world.js';
+import { ROOMS, BASE, DOOR, FEET, thingsIn, seatAt } from './shared/rooms.js';
+import { findPath } from './shared/path.js';
 import { drawAvatar, drawHat, hatRise, drawEmote, drawCat, drawProp, drawBall, drawTile, drawTrophy, TROPHY_SIZE, tileset, panorama, whenReady } from './sprites.js';
 
 const W = COLS * TILE;

@@ -14,7 +14,8 @@ import {
   defaultKeymap, history, historyKeymap, indentWithTab,
   syntaxHighlighting, HighlightStyle, bracketMatching, indentOnInput, indentUnit, javascript, tags,
 } from '../vendor/codemirror.js';
-import { CIRCLED } from './world.js';
+import { CIRCLED } from './shared/world.js';
+import { MARK } from './shared/marks.js';
 
 // ---- the look, shared by both (colours come from game.css) -------------------------------
 
@@ -55,8 +56,6 @@ function mount(extensions, value) {
 }
 
 // ---- written answers with part marks --------------------------------------------------------
-
-const MARK = /==([①-⑨])([\s\S]*?)==/g;
 
 /** The small numbered badge that stands in for a hidden "==①". */
 class Badge extends WidgetType {

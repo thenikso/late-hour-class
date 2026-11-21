@@ -2,7 +2,7 @@
 // (which decides where a player may stand) and the browser (which draws the
 // room and moves your own avatar without waiting for the server).
 //
-// Every room has the same shell: 32 × 18 tiles, the front wall with the big
+// Every room has the same shell: 32 x 18 tiles, the front wall with the big
 // screen, the door on the left, the same floor area (see world.js). What
 // changes is the flooring and the things standing in it.
 //
@@ -54,8 +54,18 @@ const base = {
     ['trophy', 20.5, 15.7, 'trophy'],
   ],
   // where the class cat likes to stop; it naps at the first one during explanations
-  catSpots: [[29.5, 7.8], [16, 7.4], [3.4, 7.3], [5, 15.9], [27, 15.9], [12.5, 15.9], [21.8, 15.9], [16, 12]],
+  catSpots: [
+    [29.5, 7.8],
+    [16, 7.4],
+    [3.4, 7.3],
+    [5, 15.9],
+    [27, 15.9],
+    [12.5, 15.9],
+    [21.8, 15.9],
+    [16, 12],
+  ],
   ballHome: { x: 12.5, y: 16.4 }, // where the break-time ball rests
+  coffeeSpot: { x: 1, y: 16.6 }, // where students can press E in free roam to sip coffee
 };
 
 // ---- the open floor ----------------------------------------------------------------------
@@ -124,6 +134,8 @@ export const nearDoor = (x, y) => Math.hypot(x - DOOR.x, y - DOOR.y) < DOOR_REAC
 
 // ---- the things in a room -------------------------------------------------------------------
 
+const thingsCache = new Map();
+
 /**
  * Everything standing in a room right now, ready to draw and to bump into:
  *   { kind, def, x, y, solid: { x, y, w, h } | null, baseline }
@@ -133,7 +145,7 @@ export const nearDoor = (x, y) => Math.hypot(x - DOOR.x, y - DOOR.y) < DOOR_REAC
  */
 export function thingsIn(roomId, unlocked = []) {
   const key = `${roomId}|${unlocked.join()}`;
-  if (!thingsIn.cache.has(key)) {
+  if (!thingsCache.has(key)) {
     const room = ROOMS[roomId] || ROOMS[BASE];
     const list = room.things
       .filter(([, , , reward]) => !reward || unlocked.includes(reward))
@@ -143,11 +155,10 @@ export function thingsIn(roomId, unlocked = []) {
         const solid = def.box ? { x: x + bx / TILE, y: y + by / TILE, w: bw / TILE, h: bh / TILE } : null;
         return { kind, def, x, y, solid, baseline: solid ? solid.y + solid.h : y + thingSize(def).h / TILE };
       });
-    thingsIn.cache.set(key, list);
+    thingsCache.set(key, list);
   }
-  return thingsIn.cache.get(key);
+  return thingsCache.get(key);
 }
-thingsIn.cache = new Map();
 
 // ---- standing and walking -------------------------------------------------------------------
 
@@ -186,12 +197,16 @@ export function walk(roomId, from, to, unlocked = []) {
 
 /** The free spot nearest to (x, y), looking further out ring by ring. */
 export function nearestFree(roomId, x, y, unlocked = [], taken = () => false) {
-  for (let r = 0; r <= 12; r += 0.5)
-    for (let dy = -r; dy <= r; dy += 0.5)
+  for (let r = 0; r <= 12; r += 0.5) {
+    for (let dy = -r; dy <= r; dy += 0.5) {
       for (let dx = -r; dx <= r; dx += 0.5) {
         if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue; // only the ring's edge
-        if (canStand(roomId, x + dx, y + dy, unlocked) && !taken(x + dx, y + dy)) return { x: x + dx, y: y + dy };
+        if (canStand(roomId, x + dx, y + dy, unlocked) && !taken(x + dx, y + dy)) {
+          return { x: x + dx, y: y + dy };
+        }
       }
+    }
+  }
   return { x, y };
 }
 
@@ -199,7 +214,11 @@ export function nearestFree(roomId, x, y, unlocked = [], taken = () => false) {
 export function arrivalSpots(roomId, count, unlocked = []) {
   const spots = [];
   const used = (x, y) => spots.some((s) => Math.abs(s.x - x) < 1 && Math.abs(s.y - y) < 0.5);
-  for (let i = 0; i < count; i++) spots.push(nearestFree(roomId, DOOR.x + 1 + (i % 12) * 1.5, FLOOR.y + 0.3 + Math.floor(i / 12) * 0.5, unlocked, used));
+  for (let i = 0; i < count; i++) {
+    const startX = DOOR.x + 1 + (i % 12) * 1.5;
+    const startY = FLOOR.y + 0.3 + Math.floor(i / 12) * 0.5;
+    spots.push(nearestFree(roomId, startX, startY, unlocked, used));
+  }
   return spots;
 }
 
@@ -214,6 +233,8 @@ export function seatAt(roomId, x, y) {
 export function seatPairs(roomId) {
   const seats = ROOMS[roomId].seats;
   const pairs = [];
-  for (let i = 0; i + 1 < seats.length; i += 2) pairs.push([seats[i], seats[i + 1]]);
+  for (let i = 0; i + 1 < seats.length; i += 2) {
+    pairs.push([seats[i], seats[i + 1]]);
+  }
   return pairs;
 }

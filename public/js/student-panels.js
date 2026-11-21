@@ -3,7 +3,7 @@
 
 import { $, h, bump, sound, toast } from './common.js';
 import { avatarCanvas, iconCanvas, trophyCanvas } from './sprites.js';
-import { HATS, hatUnlocked, hatHint } from './fun.js';
+import { HATS, hatUnlocked, hatHint } from './shared/fun.js';
 
 export function createPanels({ send }) {
   let state = null;
@@ -31,11 +31,11 @@ export function createPanels({ send }) {
     const grid = $('#hat-grid');
     grid.innerHTML = '';
     const wear = (id) => send('hat', { hat: id }).catch((e) => toast(e.message));
-    grid.append(h('button', { type: 'button', 'aria-pressed': String(!me.hat), onclick: () => wear('') }, avatarCanvas(me.avatar, 3, 'none'), 'No hat'));
+    grid.append(h('button', { type: 'button', 'aria-pressed': String(!me.hat), onclick: () => wear('') }, avatarCanvas(me.avatar, 3, { reserveHat: true }), 'No hat'));
     for (const hat of HATS) {
       const open = hatUnlocked(hat, me.term);
       grid.append(
-        h('button', { type: 'button', disabled: !open, 'aria-pressed': String(me.hat === hat.id), onclick: () => wear(hat.id) }, avatarCanvas(me.avatar, 3, hat.id), hat.name, open ? null : h('span', { class: 'hint' }, hatHint(hat))),
+        h('button', { type: 'button', disabled: !open, 'aria-pressed': String(me.hat === hat.id), onclick: () => wear(hat.id) }, avatarCanvas(me.avatar, 3, { hat: hat.id, reserveHat: true }), hat.name, open ? null : h('span', { class: 'hint' }, hatHint(hat))),
       );
     }
     $('#hat-total').textContent = `You have ${me.term.points} points so far this term.`;

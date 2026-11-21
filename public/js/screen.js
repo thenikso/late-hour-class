@@ -4,8 +4,8 @@
 import { $, h, post, connect, screenFrame, placeFrame, sound, countTo, bump, celebrate, clock, classBar } from './common.js';
 import { Room, ROOM_SIZE } from './room.js';
 import { avatarCanvas } from './sprites.js';
-import { LETTERS } from './world.js';
-import { marksToHtml } from './marks.js';
+import { LETTERS } from './shared/world.js';
+import { marksToHtml } from './shared/marks.js';
 
 const key = new URLSearchParams(location.search).get('key') || '';
 const room = new Room($('#room'));
@@ -162,7 +162,7 @@ function renderFinale() {
     if (!p) return '';
     const pts = h('span', { class: 'points' }, first ? '0' : String(p.points));
     if (first) setTimeout(() => countTo(pts, 0, p.points, 900).then(() => bump(pts)), n === 1 ? 1500 : n === 2 ? 900 : 300);
-    return h('div', { class: `place p${n}` }, avatarCanvas(p.avatar, 5, p.hat || 'none'), h('b', {}, p.name), pts, h('div', { class: 'step' }, n));
+    return h('div', { class: `place p${n}` }, avatarCanvas(p.avatar, 5, { hat: p.hat, reserveHat: true }), h('b', {}, p.name), pts, h('div', { class: 'step' }, n));
   };
   const who = (p, extra = '') => h('div', { class: 'who' }, avatarCanvas(p.avatar, 1.5), `${p.name}${extra}`);
   const awards = h('div', { class: 'awards' });

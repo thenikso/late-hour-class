@@ -14,6 +14,9 @@
 
 import { readFileSync, writeFileSync } from 'node:fs';
 import { inflateSync, deflateSync } from 'node:zlib';
+import { resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { parseArgs } from 'node:util';
 
 // ---- PNG in and out (8-bit RGB or RGBA, not interlaced) -------------------------
 export function readPng(file) {
@@ -117,9 +120,21 @@ export function cut(img, { cols, rows, cellW = 16, cellH = 16, fitW, fitH, order
     const y0 = Math.floor((Math.floor(cell / cols) * img.h) / rows);
     const x1 = Math.floor((((cell % cols) + 1) * img.w) / cols);
     const y1 = Math.floor(((Math.floor(cell / cols) + 1) * img.h) / rows);
-    // the item's bounding box inside its cell
-    let l = x1, r = x0, t = y1, b = y0;
-    for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) if (!bg(x, y)) (l = Math.min(l, x)), (r = Math.max(r, x)), (t = Math.min(t, y)), (b = Math.max(b, y));
+    // The item's bounding box inside its cell.
+    let l = x1;
+    let r = x0;
+    let t = y1;
+    let b = y0;
+    for (let y = y0; y < y1; y++) {
+      for (let x = x0; x < x1; x++) {
+        if (!bg(x, y)) {
+          l = Math.min(l, x);
+          r = Math.max(r, x);
+          t = Math.min(t, y);
+          b = Math.max(b, y);
+        }
+      }
+    }
     if (r < l) return;
     const bw = r - l + 1;
     const bh = b - t + 1;
@@ -128,14 +143,17 @@ export function cut(img, { cols, rows, cellW = 16, cellH = 16, fitW, fitH, order
     const th = Math.max(1, Math.round(bh * k));
     const ox = n * cellW + Math.floor((cellW - tw) / 2);
     const oy = align === 'bottom' ? cellH - pad - th : Math.floor((cellH - th) / 2);
-    for (let ty = 0; ty < th; ty++)
+    for (let ty = 0; ty < th; ty++) {
       for (let tx = 0; tx < tw; tx++) {
-        // most common colour of the source area this small pixel covers
-        const sx0 = l + Math.floor((tx * bw) / tw), sx1 = l + Math.max(Math.floor(((tx + 1) * bw) / tw), Math.floor((tx * bw) / tw) + 1);
-        const sy0 = t + Math.floor((ty * bh) / th), sy1 = t + Math.max(Math.floor(((ty + 1) * bh) / th), Math.floor((ty * bh) / th) + 1);
+        // Most common colour of the source area this small pixel covers.
+        const sx0 = l + Math.floor((tx * bw) / tw);
+        const sx1 = l + Math.max(Math.floor(((tx + 1) * bw) / tw), Math.floor((tx * bw) / tw) + 1);
+        const sy0 = t + Math.floor((ty * bh) / th);
+        const sy1 = t + Math.max(Math.floor(((ty + 1) * bh) / th), Math.floor((ty * bh) / th) + 1);
         const buckets = new Map();
-        let fg = 0, all = 0;
-        for (let y = sy0; y < sy1; y++)
+        let fg = 0;
+        let all = 0;
+        for (let y = sy0; y < sy1; y++) {
           for (let x = sx0; x < sx1; x++) {
             all++;
             if (bg(x, y)) continue;
@@ -143,49 +161,72 @@ export function cut(img, { cols, rows, cellW = 16, cellH = 16, fitW, fitH, order
             const i = at(x, y);
             const key = ((img.px[i] >> 5) << 6) | ((img.px[i + 1] >> 5) << 3) | (img.px[i + 2] >> 5);
             const s = buckets.get(key) || [0, 0, 0, 0];
-            s[0]++, (s[1] += img.px[i]), (s[2] += img.px[i + 1]), (s[3] += img.px[i + 2]);
+            s[0]++;
+            s[1] += img.px[i];
+            s[2] += img.px[i + 1];
+            s[3] += img.px[i + 2];
             buckets.set(key, s);
           }
+        }
         if (fg * 2 < all) continue;
         const best = [...buckets.values()].sort((p, q) => q[0] - p[0])[0];
         const o = ((oy + ty) * out.w + ox + tx) * 4;
         out.px.set([Math.round(best[1] / best[0]), Math.round(best[2] / best[0]), Math.round(best[3] / best[0]), 255], o);
       }
+    }
     if (!outline) return;
-    // a 1 px dark outline around the shape, inside this cell only
-    const solid = (x, y) => x >= n * cellW && x < (n + 1) * cellW && y >= 0 && y < cellH && out.px[(y * out.w + x) * 4 + 3] === 255 && !edge.has(y * out.w + x);
+    // A 1 px dark outline around the shape, inside this cell only.
     const edge = new Set();
-    for (let y = 0; y < cellH; y++)
-      for (let x = n * cellW; x < (n + 1) * cellW; x++)
-        if (out.px[(y * out.w + x) * 4 + 3] === 0 && (solid(x - 1, y) || solid(x + 1, y) || solid(x, y - 1) || solid(x, y + 1))) edge.add(y * out.w + x);
+    const solid = (x, y) =>
+      x >= n * cellW &&
+      x < (n + 1) * cellW &&
+      y >= 0 &&
+      y < cellH &&
+      out.px[(y * out.w + x) * 4 + 3] === 255 &&
+      !edge.has(y * out.w + x);
+    for (let y = 0; y < cellH; y++) {
+      for (let x = n * cellW; x < (n + 1) * cellW; x++) {
+        if (out.px[(y * out.w + x) * 4 + 3] === 0 && (solid(x - 1, y) || solid(x + 1, y) || solid(x, y - 1) || solid(x, y + 1))) {
+          edge.add(y * out.w + x);
+        }
+      }
+    }
     for (const i of edge) out.px.set(OUTLINE, i * 4);
   });
   return out;
 }
 
-if (process.argv[1]?.endsWith('cut-sprites.js')) {
-  const [src, dst, ...rest] = process.argv.slice(2);
-  const opt = (name, d) => {
-    const i = rest.indexOf(`--${name}`);
-    return i >= 0 ? rest[i + 1] : d;
-  };
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  const { values, positionals } = parseArgs({
+    allowPositionals: true,
+    options: {
+      cols: { type: 'string', default: '1' },
+      rows: { type: 'string', default: '1' },
+      cell: { type: 'string', default: '16' },
+      fit: { type: 'string' },
+      order: { type: 'string' },
+      align: { type: 'string', default: 'bottom' },
+      'no-outline': { type: 'boolean', default: false },
+    },
+  });
+  const [src, dst] = positionals;
   if (!src || !dst) {
     console.error('Usage: node tools/cut-sprites.js in.png out.png --cols 4 --rows 2 [--cell 16|16x32] [--fit 14x12] [--order 0,4,1] [--align bottom|center] [--no-outline]');
     process.exit(1);
   }
-  const [cellW, cellH = cellW] = String(opt('cell', '16')).split('x').map(Number);
-  const [fitW, fitH] = String(opt('fit', `${cellW}x${cellH}`)).split('x').map(Number);
+  const [cellW, cellH = cellW] = values.cell.split('x').map(Number);
+  const [fitW, fitH] = (values.fit || `${cellW}x${cellH}`).split('x').map(Number);
   const out = cut(readPng(src), {
-    cols: Number(opt('cols', 1)),
-    rows: Number(opt('rows', 1)),
+    cols: Number(values.cols),
+    rows: Number(values.rows),
     cellW,
     cellH,
     fitW,
     fitH,
-    order: opt('order') ? opt('order').split(',').map(Number) : undefined,
-    align: opt('align', 'bottom'),
-    outline: !rest.includes('--no-outline'),
+    order: values.order ? values.order.split(',').map(Number) : undefined,
+    align: values.align,
+    outline: !values['no-outline'],
   });
   writePng(dst, out);
-  console.log(`${dst}: ${out.w} × ${out.h}`);
+  console.log(`${dst}: ${out.w} x ${out.h}`);
 }

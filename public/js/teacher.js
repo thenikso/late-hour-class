@@ -2,11 +2,12 @@
 // (open → close → score → reveal), and keep an eye on the class.
 
 import { $, h, post, connect, screenFrame, classBar, clock } from './common.js';
-import { CLASS_LEVELS } from './fun.js';
+import { CLASS_LEVELS } from './shared/fun.js';
 import { Room } from './room.js';
 import { avatarCanvas } from './sprites.js';
-import { LETTERS } from './world.js';
-import { marksToHtml } from './marks.js';
+import { LETTERS } from './shared/world.js';
+import { marksToHtml } from './shared/marks.js';
+import { isSet } from './shared/util.js';
 
 const key = new URLSearchParams(location.search).get('key') || '';
 const withKey = (path) => `${path}?key=${encodeURIComponent(key)}`;
@@ -15,7 +16,6 @@ let state = null;
 const room = new Room($('#mini'));
 room.showNames = false;
 const notes = screenFrame($('#notes'));
-const isSet = (v) => v !== null && v !== undefined;
 
 // ---- talking to the server -----------------------------------------------------------
 

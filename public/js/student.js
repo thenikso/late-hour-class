@@ -5,10 +5,10 @@
 import { $, h, store, post, connect, screenFrame, placeFrame, countTo, bump, sound, toast, celebrate, classBar } from './common.js';
 import { Room, ROOM_SIZE } from './room.js';
 import { AVATARS, avatarCanvas, iconCanvas } from './sprites.js';
-import { EMOTES } from './fun.js';
-import { trophyNear } from './world.js';
-import { ROOMS, DOOR, walk } from './rooms.js';
-import { findPath } from './path.js';
+import { EMOTES } from './shared/fun.js';
+import { trophyNear } from './shared/world.js';
+import { ROOMS, DOOR, walk } from './shared/rooms.js';
+import { findPath } from './shared/path.js';
 import { createSheet } from './student-sheet.js';
 import { createPanels } from './student-panels.js';
 
@@ -311,7 +311,7 @@ function renderMe(meView) {
     box.dataset.made = made;
     box.innerHTML = '';
     box.append(
-      avatarCanvas(meView.avatar, 1.5, meView.hat),
+      avatarCanvas(meView.avatar, 1.5, { hat: meView.hat }),
       h('span', {}, meView.name),
       h('span', { class: 'points', id: 'my-points' }, String(shownPoints)),
       h('span', { class: 'quiet' }, 'pts'),

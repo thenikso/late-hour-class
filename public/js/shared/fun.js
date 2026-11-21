@@ -2,7 +2,10 @@
 // and the browser (drawing), like world.js. Everything here is cosmetic:
 // nothing in this file can lower a score.
 
-/** Quick reactions shown as a bubble over the avatar. Keys 1–6 on the student page. */
+/** Available avatar characters, in sheet order (public/assets/avatars/ava_1..8.png). */
+export const AVATAR_NAMES = ['Alex', 'Sam', 'Jo', 'Kai', 'Rio', 'Noa', 'Ivy', 'Max'];
+
+/** Quick reactions shown as a bubble over the avatar. Keys 1-6 on the student page. */
 export const EMOTES = [
   { id: 'wave', label: 'Hi!' },
   { id: 'yes', label: 'Got it' },
@@ -12,7 +15,8 @@ export const EMOTES = [
   { id: 'lost', label: "I'm lost" }, // also tells the teacher, quietly
 ];
 export const EMOTE_IDS = EMOTES.map((e) => e.id);
-export const EMOTE_GAP_MS = 1200; // one emote or hop per player in this time
+export const EMOTE_GAP_MS = 1200; // one emote per player in this time
+export const HOP_GAP_MS = 400;
 
 /**
  * Hats, in sheet order (public/assets/fun/hats.png, 16 px cells in one row).
@@ -28,6 +32,7 @@ export const HATS = [
   { id: 'wizard', name: 'Wizard hat', at: 420 },
   { id: 'crown', name: 'Crown', at: 550 },
 ];
+export const HAT_IDS = HATS.map((hat) => hat.id);
 
 export const hatUnlocked = (hat, player) => (hat.improved ? player.improved > 0 : player.points >= hat.at);
 export const hatHint = (hat) => (hat.improved ? 'Improve an answer with a retry' : `${hat.at} points`);
@@ -45,11 +50,13 @@ export const CLASS_LEVELS = [
   { id: 'trophy', at: 400, name: 'Golden trophy', text: 'The golden trophy is yours' },
 ];
 
-/** Level (0–5) for a class total, plus the points bar towards the next one. */
+/** Level (0-5) for a class total, plus the points bar towards the next one. */
 export function classProgress(total, students, floorLevel = 0) {
   const n = Math.max(1, students);
   let level = 0;
-  while (level < CLASS_LEVELS.length && total >= CLASS_LEVELS[level].at * n) level++;
+  while (level < CLASS_LEVELS.length && total >= CLASS_LEVELS[level].at * n) {
+    level++;
+  }
   level = Math.max(level, floorLevel); // a level, once earned, stays
   const next = CLASS_LEVELS[level] || null;
   const from = level ? CLASS_LEVELS[level - 1].at * n : 0;

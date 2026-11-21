@@ -8,7 +8,7 @@ export const COLS = 32;
 export const ROWS = 18;
 
 // The big screen on the front wall, where the shared page appears.
-// 16:9, like a real projector. The shared page renders at a fixed 1280×720 and is scaled to fit.
+// 16:9, like a real projector. The shared page renders at a fixed 1280x720 and is scaled to fit.
 export const SCREEN = { x: 10.7, y: 0.3, w: 10.6, h: 5.9625 };
 
 // Where a player can be: everything below the front wall. (A position is the
@@ -16,8 +16,7 @@ export const SCREEN = { x: 10.7, y: 0.3, w: 10.6, h: 5.9625 };
 export const FLOOR = { x: 1, y: 7, w: 30, h: 10.4 };
 
 // Concept trophies stand on the sill under the glass wall, and on a shelf above it,
-// left and right of the screen.
-// A slot is the top-left corner of one trophy, in tiles.
+// left and right of the screen. A slot is the top-left corner of one trophy, in tiles.
 const SHELF_ROWS = [5.3, 4.1];
 const SHELF_COLS = [2, 3, 4, 5, 6, 7, 8, 9, 22, 23, 24, 25, 26, 27, 28, 29];
 export const TROPHY_SLOTS = SHELF_ROWS.flatMap((y) => SHELF_COLS.map((x) => ({ x, y })));
@@ -34,12 +33,12 @@ export function zones(count) {
   }));
 }
 
+/** Index of the floor zone containing a player at (x, y), or -1 if outside. */
 export function zoneAt(count, x, y) {
   if (!count) return -1;
-  const z = zones(count);
   const cx = x + 0.5;
   const cy = y + 0.5;
-  return z.findIndex((r) => cx >= r.x && cx < r.x + r.w && cy >= r.y && cy < r.y + r.h);
+  return zones(count).findIndex((r) => cx >= r.x && cx < r.x + r.w && cy >= r.y && cy < r.y + r.h);
 }
 
 /** The opinion line: where a player stands across the floor, from 0 (far left) to 100 (far right). */
@@ -48,11 +47,25 @@ export function lineValue(x) {
   return Math.round(Math.max(0, Math.min(1, k)) * 100);
 }
 
-/** Which trophy slot a player is standing under (-1 if none): close to the wall, below the shelf. */
+/**
+ * All trophy slot indices standing in the shelf column above a player at (x, y).
+ * Both the sill row (0..15) and the upper shelf row (16..31) are reachable from
+ * the front strip under the glass wall.
+ */
+export function trophiesNear(count, x, y) {
+  if (y > 8) return [];
+  const limit = Math.min(count, TROPHY_SLOTS.length);
+  const hits = [];
+  for (let i = 0; i < limit; i++) {
+    if (Math.abs(TROPHY_SLOTS[i].x - x) < 0.6) hits.push(i);
+  }
+  return hits;
+}
+
+/** The most recent trophy in the shelf column above (x, y), or -1 if none. */
 export function trophyNear(count, x, y) {
-  if (y > 8) return -1;
-  const i = TROPHY_SLOTS.findIndex((s) => Math.abs(s.x - x) < 0.6);
-  return i >= 0 && i < count ? i : -1;
+  const hits = trophiesNear(count, x, y);
+  return hits.length ? hits.at(-1) : -1;
 }
 
 /** Display order of a choice question's options (deterministic shuffle by key). */

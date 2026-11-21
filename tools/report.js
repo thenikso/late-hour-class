@@ -5,16 +5,25 @@
 
 import { readFile, readdir } from 'node:fs/promises';
 import { join } from 'node:path';
+import { parseArgs } from 'node:util';
 import { sessionReport } from '../lib/report.js';
 
-const argv = process.argv.slice(2);
-let file = argv.find((a) => !a.startsWith('--'));
+const { values, positionals } = parseArgs({
+  allowPositionals: true,
+  options: {
+    names: { type: 'boolean', default: false },
+  },
+});
+
+let file = positionals[0];
 if (!file) {
-  const sessions = (await readdir('data').catch(() => [])).filter((f) => /^session-.*\.json$/.test(f)).sort();
+  const sessions = (await readdir('data').catch(() => []))
+    .filter((f) => /^session-.*\.json$/.test(f))
+    .sort();
   if (!sessions.length) {
     console.error('No session files in ./data. Usage: node tools/report.js <session.json> [--names]');
     process.exit(1);
   }
   file = join('data', sessions.at(-1));
 }
-process.stdout.write(sessionReport(JSON.parse(await readFile(file, 'utf8')), { names: argv.includes('--names') }));
+process.stdout.write(sessionReport(JSON.parse(await readFile(file, 'utf8')), { names: values.names }));

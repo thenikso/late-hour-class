@@ -7,12 +7,11 @@
 // two have their editors in code-bench.js.
 
 import { $, h, store, scoreShow, celebrate, clock } from './common.js';
-import { zoneAt, lineValue, LETTERS, CIRCLED } from './world.js';
-import { marksToHtml } from './marks.js';
+import { zoneAt, lineValue, LETTERS, CIRCLED } from './shared/world.js';
+import { marksToHtml } from './shared/marks.js';
+import { isSet } from './shared/util.js';
 import { proseEditor } from './editors.js';
 import { bugEditor, codeBench, codeLines, checkList, runChecks } from './code-bench.js';
-
-const isSet = (v) => v !== null && v !== undefined;
 
 export function createSheet({ send, room, layout }) {
   const el = $('#sheet');

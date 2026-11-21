@@ -8,7 +8,7 @@
 // that ship with the tileset (The Agency, CC0) and were trimmed by eye.
 //
 //   tiles  rows of tile ids in the office tileset (8 columns of 16 px)
-//   prop   instead of tiles: a 16 × 32 sprite from the props sheet
+//   prop   instead of tiles: a 16 x 32 sprite from the props sheet
 //   box    the solid part; leave it out for things you can walk over
 //   flat   drawn on the floor, under every avatar (a chair you sit on)
 

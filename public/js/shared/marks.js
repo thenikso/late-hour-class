@@ -3,21 +3,24 @@
 
 import { CIRCLED } from './world.js';
 
-const MARK = /==([①-⑨])([\s\S]*?)==/g;
+/** Matches one part mark like ==①given== across lines. Always use with matchAll/replace. */
+export const MARK = /==([①-⑨])([\s\S]*?)==/g;
 
 export function parseMarks(text = '') {
   const parts = {};
   for (const m of text.matchAll(MARK)) {
     const n = CIRCLED.indexOf(m[1]) + 1;
-    if (n > 0) parts[n] = (parts[n] ? parts[n] + ' … ' : '') + m[2].trim();
+    if (n > 0) {
+      parts[n] = (parts[n] ? `${parts[n]} … ` : '') + m[2].trim();
+    }
   }
   return parts;
 }
 
 export const stripMarks = (text = '') => text.replace(MARK, (_, __, inner) => inner);
 
-const esc = (s) =>
-  String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+const HTML_ESCAPE = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
+export const esc = (s) => String(s).replace(/[&<>"']/g, (c) => HTML_ESCAPE[c]);
 
 /** Escaped HTML with marked parts wrapped in coloured spans. Never renders student HTML. */
 export function marksToHtml(text = '') {
@@ -31,5 +34,3 @@ export function marksToHtml(text = '') {
   }
   return (out + esc(text.slice(last))).replace(/\n/g, '<br>');
 }
-
-export { esc };

@@ -11,7 +11,10 @@ import { canStand } from './rooms.js';
 const STEP = 0.5; // grid spacing, in tiles
 const COLS = Math.round((FLOOR.w - 1) / STEP) + 1;
 const ROWS = Math.floor((FLOOR.h - 1) / STEP) + 1;
-const NEIGHBOURS = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]];
+const NEIGHBOURS = [
+  [1, 0], [-1, 0], [0, 1], [0, -1],
+  [1, 1], [1, -1], [-1, 1], [-1, -1],
+];
 
 const toCell = (x, y) => [Math.round((x - FLOOR.x) / STEP), Math.round((y - FLOOR.y) / STEP)];
 const toSpot = (i, j) => ({ x: FLOOR.x + i * STEP, y: FLOOR.y + j * STEP });
@@ -33,17 +36,20 @@ export function findPath(roomId, from, to, unlocked = []) {
   const best = new Map([[id(si, sj), 0]]); // cell id -> cheapest cost found so far
 
   while (open.length) {
-    // take the most promising cell (a plain scan is fine for a grid this small)
-    let k = 0;
-    for (let n = 1; n < open.length; n++) if (open[n].guess < open[k].guess) k = n;
-    const cur = open.splice(k, 1)[0];
+    // Take the most promising cell (a plain scan is fast enough for this grid).
+    let bestIdx = 0;
+    for (let n = 1; n < open.length; n++) {
+      if (open[n].guess < open[bestIdx].guess) bestIdx = n;
+    }
+    const cur = open.splice(bestIdx, 1)[0];
     if (cur.i === gi && cur.j === gj) return trace(cameFrom, cur, id);
 
     for (const [di, dj] of NEIGHBOURS) {
       const i = cur.i + di;
       const j = cur.j + dj;
       if (!free(i, j)) continue;
-      if (di && dj && (!free(cur.i + di, cur.j) || !free(cur.i, cur.j + dj))) continue; // no cutting corners
+      // Diagonal steps require both adjacent orthogonal cells to be free (no corner cutting).
+      if (di && dj && (!free(cur.i + di, cur.j) || !free(cur.i, cur.j + dj))) continue;
       const cost = cur.cost + Math.hypot(di, dj);
       if (cost >= (best.get(id(i, j)) ?? Infinity)) continue;
       best.set(id(i, j), cost);
@@ -57,14 +63,22 @@ export function findPath(roomId, from, to, unlocked = []) {
 /** Walk back from the goal to the start, then turn the list around. */
 function trace(cameFrom, cell, id) {
   const path = [];
-  for (let c = cell; c; c = cameFrom.get(id(c.i, c.j))) path.push(toSpot(c.i, c.j));
+  for (let c = cell; c; c = cameFrom.get(id(c.i, c.j))) {
+    path.push(toSpot(c.i, c.j));
+  }
   return path.reverse().slice(1); // without the starting spot
 }
 
 /** The free cell closest to (i, j): a tap on a desk means "next to that desk". */
 function nearestFreeCell(free, i, j) {
-  for (let r = 0; r < 8; r++)
-    for (let dj = -r; dj <= r; dj++)
-      for (let di = -r; di <= r; di++) if (Math.max(Math.abs(di), Math.abs(dj)) === r && free(i + di, j + dj)) return [i + di, j + dj];
+  for (let r = 0; r < 8; r++) {
+    for (let dj = -r; dj <= r; dj++) {
+      for (let di = -r; di <= r; di++) {
+        if (Math.max(Math.abs(di), Math.abs(dj)) === r && free(i + di, j + dj)) {
+          return [i + di, j + dj];
+        }
+      }
+    }
+  }
   return [-1, -1];
 }
