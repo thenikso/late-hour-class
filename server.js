@@ -174,7 +174,7 @@ export function lanAddress() {
 // ---- the server ------------------------------------------------------------------------
 
 export async function start(opts = {}) {
-  const port = Number(opts.port || 3000);
+  const port = opts.port === undefined ? 3000 : Number(opts.port);
   const host = opts.host || lanAddress();
   const log = opts.quiet ? () => {} : console.log;
   const fill = (url) => (url ? String(url).replace(/\{host\}/g, host) : url); // "{host}" in a URL means this laptop
@@ -313,7 +313,7 @@ export async function start(opts = {}) {
       if (url.pathname === '/events') return openStream(req, res, url);
       if (req.method === 'POST' && url.pathname.startsWith('/api/')) return await handlePost(req, res, url);
       if (req.method !== 'GET') return send(res, 405, 'Method not allowed');
-      if (url.pathname === '/api/info') return json(res, 200, { lesson: game.lesson.title, studentUrl: `http://${host}:${port}/` });
+      if (url.pathname === '/api/info') return json(res, 200, { lesson: game.lesson.title, studentUrl: `http://${host}:${server.address().port}/` });
       if (url.pathname === '/report') {
         if (!isTeacher(url)) return send(res, 403, 'Wrong key');
         await game.save();
@@ -330,13 +330,14 @@ export async function start(opts = {}) {
   });
 
   await new Promise((ok) => server.listen(port, '0.0.0.0', ok));
+  const actualPort = server.address().port;
   return {
-    port,
+    port: actualPort,
     key,
     game,
-    studentUrl: `http://${host}:${port}/`,
-    teacherUrl: `http://localhost:${port}/teacher?key=${key}`,
-    screenUrl: `http://localhost:${port}/screen?key=${key}`,
+    studentUrl: `http://${host}:${actualPort}/`,
+    teacherUrl: `http://localhost:${actualPort}/teacher?key=${key}`,
+    screenUrl: `http://localhost:${actualPort}/screen?key=${key}`,
     close: async ({ flush = false } = {}) => {
       clearInterval(tick);
       clearInterval(keepAlive);

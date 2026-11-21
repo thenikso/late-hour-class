@@ -104,6 +104,8 @@ export async function serveSlides(folder, { port = 3001, teacherPort = 3002, kee
   await new Promise((ok) => student.listen(port, '0.0.0.0', ok));
   await new Promise((ok) => teacher.listen(teacherPort, '127.0.0.1', ok));
   return {
+    port: student.address().port,
+    teacherPort: teacher.address().port,
     close: () => Promise.all([new Promise((ok) => student.close(ok)), new Promise((ok) => teacher.close(ok))]),
   };
 }
