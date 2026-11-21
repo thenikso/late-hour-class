@@ -48,7 +48,7 @@ printStartup(s);
 
 for (const signal of ['SIGINT', 'SIGTERM']) {
   process.on(signal, async () => {
-    await s.close();
+    await s.close({ flush: true });
     await slides.close();
     process.exit(0);
   });

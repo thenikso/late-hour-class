@@ -7,8 +7,9 @@
 
 import { createServer } from 'node:http';
 import { readFile, stat } from 'node:fs/promises';
-import { extname, join, normalize, resolve } from 'node:path';
+import { extname, join, normalize, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { parseArgs } from 'node:util';
 
 const TYPES = {
   '.html': 'text/html; charset=utf-8',
@@ -52,27 +53,42 @@ export function removeElements(html, open) {
 
 export function studentCopy(html, { keepAnswers = false } = {}) {
   let out = removeElements(html, /<(div)\b[^>]*\bclass="sn"[^>]*>/);
-  if (!keepAnswers)
-    out = out.replace(/(<section\b[^>]*data-mode="work"[^>]*>)([\s\S]*?)(<\/section>)/g, (_, a, body, c) =>
-      a + removeElements(body, /<(\w+)\b[^>]*\bdata-cue\b[^>]*>/) + c,
-    );
+  if (!keepAnswers) {
+    out = out.replace(/(<section\b[^>]*data-mode="work"[^>]*>)([\s\S]*?)(<\/section>)/g, (_, a, body, c) => {
+      return a + removeElements(body, /<(\w+)\b[^>]*\bdata-cue\b[^>]*>/) + c;
+    });
+  }
   return out;
 }
 
 function makeServer(root, { strip, keepAnswers }) {
   return createServer(async (req, res) => {
-    const url = new URL(req.url, 'http://x');
-    let file = normalize(join(root, decodeURIComponent(url.pathname)));
-    if (!file.startsWith(root)) return res.writeHead(403).end('Forbidden');
+    let file;
+    try {
+      const url = new URL(req.url, 'http://x');
+      file = normalize(join(root, decodeURIComponent(url.pathname)));
+    } catch {
+      res.writeHead(400, { 'content-type': 'text/plain' }).end('Bad request');
+      return;
+    }
+
+    if (file !== root && !file.startsWith(root + sep)) {
+      res.writeHead(403, { 'content-type': 'text/plain' }).end('Forbidden');
+      return;
+    }
+
     try {
       let s = await stat(file);
       if (s.isDirectory()) {
         file = join(file, 'index.html');
         s = await stat(file);
       }
+      if (!s.isFile()) throw new Error('not a file');
       const type = TYPES[extname(file)] || 'application/octet-stream';
       let body = await readFile(file);
-      if (strip && extname(file) === '.html') body = studentCopy(body.toString('utf8'), { keepAnswers });
+      if (strip && extname(file) === '.html') {
+        body = studentCopy(body.toString('utf8'), { keepAnswers });
+      }
       res.writeHead(200, { 'content-type': type, 'access-control-allow-origin': '*', 'cache-control': 'no-cache' });
       res.end(body);
     } catch {
@@ -93,15 +109,18 @@ export async function serveSlides(folder, { port = 3001, teacherPort = 3002, kee
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  const argv = process.argv.slice(2);
-  const folder = argv.find((a) => !a.startsWith('--')) || '.';
-  const val = (name, d) => {
-    const i = argv.indexOf(`--${name}`);
-    return i >= 0 ? argv[i + 1] : d;
-  };
-  const port = Number(val('port', 3001));
-  const teacherPort = Number(val('teacher-port', 3002));
-  serveSlides(folder, { port, teacherPort, keepAnswers: argv.includes('--keep-answers') }).then(() => {
+  const { values, positionals } = parseArgs({
+    allowPositionals: true,
+    options: {
+      port: { type: 'string', default: '3001' },
+      'teacher-port': { type: 'string', default: '3002' },
+      'keep-answers': { type: 'boolean', default: false },
+    },
+  });
+  const folder = positionals[0] || '.';
+  const port = Number(values.port);
+  const teacherPort = Number(values['teacher-port']);
+  serveSlides(folder, { port, teacherPort, keepAnswers: values['keep-answers'] }).then(() => {
     console.log(`  Slides for students (no notes): http://<this-laptop>:${port}/`);
     console.log(`  Slides for the teacher (full):  http://localhost:${teacherPort}/`);
   });

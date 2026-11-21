@@ -19,8 +19,9 @@
 import { createServer } from 'node:http';
 import { readFile, stat } from 'node:fs/promises';
 import { networkInterfaces } from 'node:os';
-import { extname, join, normalize, resolve, dirname } from 'node:path';
+import { extname, join, normalize, resolve, dirname, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { parseArgs } from 'node:util';
 import { randomBytes } from 'node:crypto';
 import { loadLesson } from './lib/manifest.js';
 import { loadTerm } from './lib/term.js';
@@ -38,10 +39,16 @@ const MAX_BODY = 64 * 1024;
 const STUDENT_ACTIONS = {
   move: (game, p, b) => ({ ok: game.move(p, b.x, b.y, b.dir, b.moving, b.warp), mode: game.mode }),
   emote: (game, p, b) => ({ ok: game.emote(p, b.e) }),
-  hat: (game, p, b) => (game.setHat(p, b.hat), { ok: true }),
+  hat: (game, p, b) => {
+    game.setHat(p, b.hat);
+    return { ok: true };
+  },
   answer: (game, p, b) => ({ ok: true, state: game.submit(p, b).state }),
   ask: (game, p, b) => ({ ok: true, status: game.ask(p, b.text).status }),
-  vote: (game, p, b) => (game.voteAsk(p, b.id), { ok: true }),
+  vote: (game, p, b) => {
+    game.voteAsk(p, b.id);
+    return { ok: true };
+  },
 };
 
 // ---- what the teacher can do ---------------------------------------------------------
@@ -101,14 +108,26 @@ function send(res, code, body, type = 'text/plain; charset=utf-8') {
   res.writeHead(code, { 'content-type': type, 'cache-control': 'no-store' });
   res.end(typeof body === 'string' ? body : JSON.stringify(body));
 }
+
 const json = (res, code, body) => send(res, code, body, 'application/json');
 
 async function serveStatic(res, pathname) {
-  const full = normalize(join(PUBLIC, PAGES[pathname] || pathname.slice(1)));
-  if (!full.startsWith(PUBLIC)) return send(res, 403, 'Forbidden'); // no climbing out of public/
+  let rel;
+  try {
+    rel = PAGES[pathname] || decodeURIComponent(pathname.slice(1));
+  } catch {
+    return send(res, 400, 'Bad request');
+  }
+  const full = normalize(join(PUBLIC, rel));
+  if (full !== PUBLIC && !full.startsWith(PUBLIC + sep)) {
+    return send(res, 403, 'Forbidden'); // no climbing out of public/
+  }
   try {
     if (!(await stat(full)).isFile()) throw new Error('not a file');
-    res.writeHead(200, { 'content-type': TYPES[extname(full)] || 'application/octet-stream', 'cache-control': 'no-cache' });
+    res.writeHead(200, {
+      'content-type': TYPES[extname(full)] || 'application/octet-stream',
+      'cache-control': 'no-cache',
+    });
     res.end(await readFile(full));
   } catch {
     send(res, 404, 'Not found');
@@ -125,7 +144,9 @@ function readBody(req) {
       if (size > MAX_BODY) {
         fail(new Error('Body too large'));
         req.destroy();
-      } else chunks.push(chunk);
+      } else {
+        chunks.push(chunk);
+      }
     });
     req.on('end', () => {
       try {
@@ -138,22 +159,13 @@ function readBody(req) {
   });
 }
 
-/** `--port 3000 --ai=mock --no-gate` → { port: '3000', ai: 'mock', 'no-gate': true } */
-function parseArgs(argv) {
-  const out = {};
-  for (let i = 0; i < argv.length; i++) {
-    if (!argv[i].startsWith('--')) continue;
-    const [name, value] = argv[i].slice(2).split('=');
-    const next = argv[i + 1];
-    out[name] = value ?? (next && !next.startsWith('--') ? argv[++i] : true);
-  }
-  return out;
-}
-
 /** This laptop's address on the Wi-Fi, for the link students type. */
 export function lanAddress() {
-  for (const list of Object.values(networkInterfaces()))
-    for (const n of list || []) if (n.family === 'IPv4' && !n.internal) return n.address;
+  for (const list of Object.values(networkInterfaces())) {
+    for (const n of list || []) {
+      if (n.family === 'IPv4' && !n.internal) return n.address;
+    }
+  }
   return 'localhost';
 }
 
@@ -179,6 +191,7 @@ export async function start(opts = {}) {
     term: await loadTerm(termFile, log),
     termFile,
     gate: !opts['no-gate'],
+    maxPlayers: opts.maxPlayers ? Number(opts.maxPlayers) : undefined,
     log,
   });
   if (opts.resume) {
@@ -188,17 +201,36 @@ export async function start(opts = {}) {
 
   // Everyone listening on /events: { res, role, player }.
   const clients = new Set();
-  const push = (client, event, data) => client.res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+
+  function safeWrite(client, payload) {
+    if (client.res.writableEnded || client.res.destroyed) {
+      clients.delete(client);
+      return;
+    }
+    try {
+      client.res.write(payload);
+    } catch {
+      clients.delete(client);
+    }
+  }
+
+  const push = (client, event, data) => safeWrite(client, `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
   const pushAll = (event, data) => clients.forEach((c) => push(c, event, data));
-  const viewFor = (c) => (c.role === 'student' ? game.studentView(c.player) : c.role === 'teacher' ? game.teacherView() : game.screenView());
+  const viewFor = (c) => {
+    if (c.role === 'student') return game.studentView(c.player);
+    if (c.role === 'teacher') return game.teacherView();
+    return game.screenView();
+  };
 
   game.onChange(() => {
-    for (const c of clients) {
+    for (const c of [...clients]) {
       if (c.role === 'student' && !game.players.has(c.player.id)) {
         push(c, 'kicked', {});
         c.res.end();
         clients.delete(c);
-      } else push(c, 'state', viewFor(c));
+      } else {
+        push(c, 'state', viewFor(c));
+      }
     }
   });
   game.onFx((event) => pushAll('fx', event));
@@ -207,13 +239,18 @@ export async function start(opts = {}) {
   let lastPositions = '';
   const tick = setInterval(() => {
     if (game.stepBall(0.1)) pushAll('ball', [+game.ball.x.toFixed(2), +game.ball.y.toFixed(2)]);
+    if (!clients.size) return;
     const positions = JSON.stringify(game.positions());
     if (positions === lastPositions) return;
     lastPositions = positions;
-    for (const c of clients) c.res.write(`event: pos\ndata: ${positions}\n\n`);
+    const payload = `event: pos\ndata: ${positions}\n\n`;
+    for (const c of [...clients]) safeWrite(c, payload);
   }, 100);
+
   // A comment line now and then keeps proxies and browsers from closing a quiet stream.
-  const keepAlive = setInterval(() => clients.forEach((c) => c.res.write(': ping\n\n')), 15000);
+  const keepAlive = setInterval(() => {
+    for (const c of [...clients]) safeWrite(c, ': ping\n\n');
+  }, 15000);
 
   const isTeacher = (url) => url.searchParams.get('key') === key;
 
@@ -225,8 +262,11 @@ export async function start(opts = {}) {
       if (!player) return json(res, 401, { error: 'Unknown player' });
       client = { res, role, player };
       game.setOnline(player, +1);
-    } else if ((role === 'teacher' || role === 'screen') && isTeacher(url)) client = { res, role };
-    else return json(res, 403, { error: 'Wrong key' });
+    } else if ((role === 'teacher' || role === 'screen') && isTeacher(url)) {
+      client = { res, role };
+    } else {
+      return json(res, 403, { error: 'Wrong key' });
+    }
 
     res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-store', connection: 'keep-alive' });
     res.write('retry: 1500\n\n');
@@ -261,7 +301,12 @@ export async function start(opts = {}) {
   }
 
   const server = createServer(async (req, res) => {
-    const url = new URL(req.url, `http://${req.headers.host || 'x'}`);
+    let url;
+    try {
+      url = new URL(req.url, `http://${req.headers.host || 'x'}`);
+    } catch {
+      return send(res, 400, 'Bad request');
+    }
     try {
       if (url.pathname === '/events') return openStream(req, res, url);
       if (req.method === 'POST' && url.pathname.startsWith('/api/')) return await handlePost(req, res, url);
@@ -290,10 +335,15 @@ export async function start(opts = {}) {
     studentUrl: `http://${host}:${port}/`,
     teacherUrl: `http://localhost:${port}/teacher?key=${key}`,
     screenUrl: `http://localhost:${port}/screen?key=${key}`,
-    close: () => {
+    close: async ({ flush = false } = {}) => {
       clearInterval(tick);
       clearInterval(keepAlive);
+      if (flush && game.players.size) {
+        await game.save().catch((e) => log('final save failed:', e.message));
+      }
+      game.dispose();
       for (const c of clients) c.res.end();
+      clients.clear();
       return new Promise((ok) => server.close(ok));
     },
   };
@@ -308,13 +358,39 @@ export function printStartup(s) {
   console.log(`  Projector: ${s.screenUrl}`);
   console.log(`  AI scoring: ${game.aiMode}   Session file: ${game.sessionFile}`);
   const missing = cliMissing(game.aiMode);
-  if (missing) console.log(`\n  ! The "${missing}" command was not found, so score suggestions will fail.\n    Score by hand, or restart with --ai codex | mock | off.`);
+  if (missing) {
+    console.log(`\n  ! The "${missing}" command was not found, so score suggestions will fail.\n    Score by hand, or restart with --ai codex | mock | off.`);
+  }
   console.log('');
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  start(parseArgs(process.argv.slice(2)))
-    .then(printStartup)
+  const { values } = parseArgs({
+    options: {
+      lesson: { type: 'string' },
+      deck: { type: 'string' },
+      projector: { type: 'string' },
+      notes: { type: 'string' },
+      port: { type: 'string' },
+      host: { type: 'string' },
+      ai: { type: 'string' },
+      data: { type: 'string' },
+      resume: { type: 'string' },
+      term: { type: 'string' },
+      key: { type: 'string' },
+      'no-gate': { type: 'boolean', default: false },
+    },
+  });
+  start(values)
+    .then((s) => {
+      printStartup(s);
+      for (const signal of ['SIGINT', 'SIGTERM']) {
+        process.on(signal, async () => {
+          await s.close({ flush: true });
+          process.exit(0);
+        });
+      }
+    })
     .catch((e) => {
       console.error(e.message);
       process.exit(1);
