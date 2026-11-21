@@ -10,7 +10,7 @@
     if (msg.type === 'cge:cue') dispatchEvent(new KeyboardEvent('keydown', { key: 'e' }));
   });
   // The other way round: the deck can ask the game for a few things. It only works on
-  // the projector, where the teacher's page listens; everywhere else nothing happens.
+  // the projector, where screen.js listens; everywhere else nothing happens.
   //   classGame.open('g')       open the question with that key
   //   classGame.trophy('m')     award a trophy
   //   classGame.timer(120)      show a two minute countdown

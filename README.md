@@ -1,6 +1,6 @@
 # Class game engine
 
-The design and its reasons are in [docs/design.md](docs/design.md); notes for working on the code (with Claude or otherwise) are in [CLAUDE.md](CLAUDE.md).
+The design and its reasons are in [docs/design.md](docs/design.md); a 1-page tour of the codebase for students is in [ARCHITECTURE.md](ARCHITECTURE.md); notes for working on the code (with Claude or otherwise) are in [CLAUDE.md](CLAUDE.md).
 
 A pixel-art classroom that runs from the teacher's laptop. Students join from their own browser over the classroom Wi-Fi, pick an avatar and walk around a shared room. The teacher drives the slides on the room's screen, seats everyone for explanations, opens questions, and reveals scores with a bit of show.
 
@@ -48,11 +48,11 @@ In the teacher view, type a slide number in **Go to** and press Enter (or click 
 - **Room:** Free roam, Take your seat (a countdown, then everyone is seated and the slides fill the screen), Presentation, or share any URL on the screen.
 - **Rooms:** *Door to* Classroom, Open floor or Workshop. The door opens for a few seconds and the class walks through together; anyone left is moved along. A question can name its room, and then opening it opens the door first. *Take your seat* and *Presentation* always bring everyone back to the classroom.
 - **Slides:** ◀ ▶, E for the next reveal step (also the arrow keys and E on the keyboard), Go to, and the speaker notes for the current slide.
-- **Questions:** open, close, *Suggest scores* (AI), adjust any score 0–3 and its feedback, *Reveal to everyone*, then *Show a sound answer* if the lesson has one. Quick questions can be asked on the spot: written, zones, or an opinion line.
+- **Questions:** open, close, *Suggest scores* (AI), adjust any score 0–3 and its feedback, *Reveal to everyone*, toggle names on the projector wall (anonymous by default), then *Show a sound answer* if the lesson has one. 1-click micro-checks (*Pulse: Makes sense?*, *Confidence line*, *True / False*) and custom quick questions can be asked on the spot.
 - **The submit gate:** while students are still writing, *Close* reads *Close anyway (3 still writing)*, and anything else that would move the room on (another question, Presentation, Take your seat) asks first. Changing slide is always free. Only you see the names.
 - **Hot seat:** *Spotlight* puts one answer on the projector and walks its author to the front of the room; *Pick someone* chooses at random among those who answered.
-- **Students ask:** students send questions about the lesson with *Ask*. Real questions go on a board where classmates vote; anything else is held for you to post or dismiss. *On projector* shows the top five before your next explanation.
-- **Players:** see who is online, rename or remove someone.
+- **Students ask:** students send questions about the lesson with *Ask* (tagged with the current slide). Real questions go on a board where classmates vote; anything else is held for you to post or dismiss. *On projector* shows the top five before your next explanation.
+- **Players:** see who is online, rename, unlock an offline seat for rejoin (`↺`, so a student switching devices keeps their points and answers), or remove someone.
 - **After class:** *Report* (or `npm run report`) gives the hand-in rate and timing of every question, the concepts the scorer said were missed, and the questions students asked.
 - **Pace and mood:** a soft timer on the open question (1, 2, 3 or 5 minutes; nothing closes by itself), a note in the top bar when students press *I'm lost*, and **Finale** for the last minute of class: a podium, who improved, who never missed a question.
 
@@ -82,7 +82,7 @@ AI scoring sends the question, the rubric and the answers (as a1, a2…, no name
 ## The fun parts
 
 - **Walking:** arrow keys or WASD, or tap/click the floor and your avatar finds its way there. Furniture is solid: you walk around desks, and you can stand behind or in front of them.
-- **E:** use what is next to you. Sit on a free chair, read a trophy on the sill, go through the open door, pet the cat. A hint at the bottom of the screen says what E would do; on a touch screen, tap the hint.
+- **E:** use what is next to you. Sit on a free chair, read a trophy on the sill or upper shelf, go through the open door, grab coffee in free roam, or pet the cat. A hint at the bottom of the screen says what E would do; on a touch screen, tap the hint.
 - **Reactions:** six bubbles over your avatar (keys 1–6 or the top bar), and Space to hop. *I'm lost* also tells the teacher, quietly; *Got it* clears it.
 - **Hats:** your own points unlock hats; improving an answer on a retry unlocks the scholar cap.
 - **Class goal:** everyone's points fill one bar. Each level adds something to the room for all: fairy lights, a cat, an arcade machine and a ball to kick around in breaks, a disco ball at results time, a golden trophy.
@@ -135,12 +135,16 @@ To run another deck: `node server.js --lesson <teacher deck url> --deck <student
 
 ## Files
 
-- `server.js`: HTTP server, live updates (server-sent events), the list of student and teacher actions.
-- `lib/`: the room and its rules (`game.js`), points (`scoring.js`), what each role sees (`views.js`), the questions board (`asks.js`), what carries over between lessons (`term.js`), the report (`report.js`), the lesson reader (`manifest.js`), quick checks (`checks.js`), AI scoring (`ai.js`).
-- `public/`: the three pages (student, teacher, projector), the room and avatar drawing, styles. The rooms are data: `js/rooms.js` (what stands where), `js/things.js` (furniture and its solid boxes), `js/path.js` (finding a way around it).
+See [ARCHITECTURE.md](ARCHITECTURE.md) for a walkthrough of how a student action flows through the codebase.
+
+- `server.js`: HTTP server, live updates (server-sent events), student and teacher action tables, graceful shutdown.
+- `lib/`: room state (`game.js`), question lifecycle & pairs (`questions.js`), pure scoring (`scoring.js`), role views (`views.js`), the questions board (`asks.js`), atomic persistence (`session.js`, `term.js`), the report (`report.js`), the lesson reader (`manifest.js`), quick checks (`checks.js`), AI scoring (`ai.js`).
+- `public/js/shared/`: pure modules imported by both Node and the browser — `world.js`, `things.js`, `rooms.js`, `path.js`, `fun.js`, `marks.js`, `util.js`.
+- `public/`: the three pages (student, teacher, projector), room art & rendering (`room-shell.js`, `room.js`, `sprites.js`), QR join code (`qr.js`), CodeMirror wrappers (`editors.js`), code bench sandbox (`code-bench.js`), and styles.
 - `public/assets/`: the office tileset and the 8 avatar sheets, from The Agency (CC0 1.0, see `public/assets/LICENSE.md`).
-- `public/vendor/codemirror.js`: CodeMirror 6 (MIT), bundled once from `tools/vendor/` (`npm install && npm run build` there to rebuild). The editors built on it are in `public/js/editors.js`.
-- `tools/cut-sprites.js`: shrinks an AI-drawn sprite sheet to crisp game-size sprites. `tools/shrink-image.js` does the same for a whole picture (the view outside the windows). `tools/report.js`: the session report.
+- `public/vendor/codemirror.js`: CodeMirror 6 (MIT), bundled once from `tools/vendor/` (`npm install && npm run build` there to rebuild).
+- `test/`: isolated unit and ephemeral-port HTTP integration tests (`npm test`).
+- `tools/`: `serve-slides.js`, `run-example.js`, `report.js`, `cut-sprites.js`, `shrink-image.js`.
 - `example/lectures/`: the Week 8 deck, made game-ready.
 - `data/`: one session file per class, with names and answers. It is git-ignored; keep it off any public repository.
 

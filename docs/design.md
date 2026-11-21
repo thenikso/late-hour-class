@@ -135,7 +135,7 @@ The engine stays generic by reading a small, course-neutral **lesson manifest**.
 </script>
 ```
 
-(This was the proposal; the POC's actual schema is in `CLAUDE.md` and `lib/manifest.js`. Trophies and `data-game-room` are not built yet.)
+(This was the initial proposal; the implemented schema is in `CLAUDE.md` and `lib/manifest.js`, including trophies and `data-game-room`.)
 
 How it works and where to draw the lines:
 
