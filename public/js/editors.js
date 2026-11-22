@@ -108,15 +108,22 @@ const liveMarks = ViewPlugin.fromClass(
 );
 
 /**
- * An editor for a written answer. Returns { el, mark(n), focus() }:
+ * An editor for a written answer. Returns { el, mark(n), focus(), setText(text) }:
  * `mark(n)` wraps the selected text as required part n, the way the ①②③ buttons do.
+ * `readOnly` makes a window onto someone else's typing (a shared desk draft, while a
+ * partner holds the pen); `setText` replaces what it shows.
  */
-export function proseEditor({ value = '', label = 'Your answer', onChange, onKey, onPaste }) {
-  const { el, view } = mount([...basics({ label, onChange, onKey, onPaste }), EditorView.lineWrapping, placeholder(label), liveMarks], value);
-  el.className = 'editor prose';
+export function proseEditor({ value = '', label = 'Your answer', onChange, onKey, onPaste, readOnly = false }) {
+  const locked = readOnly ? [EditorState.readOnly.of(true), EditorView.editable.of(false)] : [];
+  const { el, view } = mount([...basics({ label, onChange, onKey, onPaste }), EditorView.lineWrapping, placeholder(label), liveMarks, ...locked], value);
+  el.className = readOnly ? 'editor prose watching' : 'editor prose';
   return {
     el,
     focus: () => view.focus(),
+    setText(text) {
+      if (text === view.state.doc.toString()) return;
+      view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: text } });
+    },
     mark(n) {
       const { from, to } = view.state.selection.main;
       const inner = view.state.sliceDoc(from, to);

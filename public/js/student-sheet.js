@@ -6,6 +6,9 @@
 // bug (click the faulty line) and code (write and run JavaScript); the last
 // two have their editors in code-bench.js. A rapid round shows one line at a
 // time: you answer by standing in a zone when its time runs out.
+//
+// Written pair work is one shared draft per desk (lib/desks.js): whoever holds
+// the pen types, the others at the desk watch it appear and can take the pen.
 
 import { $, h, store, scoreShow, celebrate, clock } from './common.js';
 import { zoneAt, lineValue, LETTERS, CIRCLED } from './shared/world.js';
@@ -39,6 +42,13 @@ export function createSheet({ send, room, layout, panels }) {
   let shownResult = store.get('cge-shown') || ''; // the result card pops up once per attempt
   const drafts = {}; // question key -> what the student has typed or picked so far
 
+  // The shared desk draft (written pair work): the latest text we know, and the editor showing it.
+  let deskLive = { key: null, n: -1, text: '', v: -1 };
+  let deskEditor = null;
+  let deskTimer = null;
+  let deskPending = null; // text typed but not sent yet
+  const canWrite = (s) => !!s.desk && s.desk.n >= 0 && (!s.desk.pen || s.desk.pen === s.me.id);
+
   function draftFor(q) {
     drafts[q.key] ||= {
       text: '',
@@ -60,6 +70,7 @@ export function createSheet({ send, room, layout, panels }) {
   function render(s) {
     const moved = s.question?.key !== state?.question?.key;
     state = s;
+    if (s.desk && takeDeskText({ key: s.question?.key, ...s.desk }) && deskEditor && !canWrite(s)) deskEditor.setText(deskLive.text);
     const q = s.question;
     const mine = s.mine;
     if (moved) {
@@ -89,6 +100,7 @@ export function createSheet({ send, room, layout, panels }) {
       q.row,
       q.phase,
       q.order,
+      s.desk ? [s.desk.n, canWrite(s)] : null, // not the text: that streams in without a redraw
       editing,
       !!q.example,
       mates,
@@ -100,6 +112,7 @@ export function createSheet({ send, room, layout, panels }) {
       drawn = sig;
       el.hidden = false;
       el.innerHTML = '';
+      deskEditor = null;
       el.append(
         h(
           'div',
@@ -121,7 +134,7 @@ export function createSheet({ send, room, layout, panels }) {
       );
       if (q.prompt) el.append(h('p', { class: 'prompt' }, q.prompt));
       if (q.context) el.append(h('p', { class: 'context' }, q.context));
-      if (mates.length) {
+      if (mates.length && !s.desk) {
         const roleNote =
           s.me.pairRole === 'driver'
             ? 'You are Driver (type and hand in together).'
@@ -135,8 +148,86 @@ export function createSheet({ send, room, layout, panels }) {
         el.append(h('p', { class: 'quiet small' }, 'One sound answer:'), h('div', { class: 'feedback' }, q.example));
       }
     }
+    deskInfo();
     tick();
     maybeShowResult();
+  }
+
+  // ---- the shared desk draft -----------------------------------------------------------------
+
+  /** Keep the newest desk text we have heard of (from the state or a `desk` event). */
+  function takeDeskText(d) {
+    if (d.n < 0) return false;
+    const sameDesk = d.key === deskLive.key && d.n === deskLive.n;
+    if (sameDesk && d.v <= deskLive.v) return false;
+    deskLive = { key: d.key, n: d.n, text: d.text, v: d.v };
+    return true;
+  }
+
+  /** A `desk` event: the pen holder typed. Watchers see it at once; the writer already has it. */
+  function deskText(d) {
+    if (!state?.question || d.key !== state.question.key || !takeDeskText(d)) return;
+    if (deskEditor && !canWrite(state)) deskEditor.setText(d.text);
+  }
+
+  /** Who is at this desk and who has the pen, updated without redrawing the editor. */
+  function deskInfo() {
+    const desk = state?.desk;
+    const who = $('#desk-who');
+    if (!desk || desk.n < 0 || !who) return;
+    const others = desk.members.filter((m) => m.id !== state.me.id).map((m) => m.name);
+    const withWho = others.length ? `with ${others.join(' and ')}` : 'on your own so far';
+    let pen = 'The pen is free: start typing to take it.';
+    if (desk.pen === state.me.id) pen = 'You have the pen.';
+    else if (desk.pen) pen = `${desk.penName} has the pen.`;
+    const text = `Desk ${desk.n + 1}, ${withWho}. ${pen}`;
+    if (who.textContent !== text) who.textContent = text;
+    $('#take-pen').hidden = canWrite(state);
+  }
+
+  /** Typing at the desk: send the text a moment after the last key, not on every key. */
+  function queueDraft(text) {
+    deskPending = text;
+    clearTimeout(deskTimer);
+    deskTimer = setTimeout(sendDraft, 250);
+  }
+
+  async function sendDraft() {
+    clearTimeout(deskTimer);
+    if (deskPending === null) return;
+    const text = deskPending;
+    deskPending = null;
+    const d = draftFor(state.question);
+    // How it was typed since the last send (for the teacher's flags only).
+    const meta = { pastedChars: d.pastedChars - (d.sentPasted || 0), activeMs: d.activeMs - (d.sentActive || 0) };
+    d.sentPasted = d.pastedChars;
+    d.sentActive = d.activeMs;
+    try {
+      await send('draft', { text, meta });
+    } catch {
+      // Someone took the pen just now: their text wins, and the next state turns us into a watcher.
+    }
+  }
+
+  /** The shared draft: an editor for the pen holder, a live window for everyone else at the desk. */
+  function deskBox(q, d) {
+    const desk = state.desk;
+    deskEditor = null;
+    if (desk.n < 0) {
+      return h('p', { class: 'pair' }, 'Sit at a desk with your partner, or stand right beside it: each desk writes one answer together.');
+    }
+    const writing = canWrite(state);
+    const take = h('button', { class: 'btn small', id: 'take-pen', type: 'button' }, '✎ Take the pen');
+    take.onclick = () => send('pen').catch(() => {});
+    const wrap = h('div', {}, h('div', { class: 'row desk-bar' }, h('span', { class: 'pair', id: 'desk-who' }), take));
+    wrap.append(
+      textEditor(q.parts || [], d, writing ? "Your desk's answer" : 'Your partner is writing…', {
+        value: deskLive.text,
+        readOnly: !writing,
+        onChange: queueDraft,
+      }),
+    );
+    return wrap;
   }
 
   /**
@@ -284,7 +375,8 @@ export function createSheet({ send, room, layout, panels }) {
     if (q.kind === 'choice') out.push(choiceEditor(q, d));
     if (q.kind === 'grid') out.push(gridEditor(q, d));
     if (q.kind === 'line') out.push(h('p', { class: 'quiet', id: 'stand-hint' }));
-    if (q.kind === 'text') out.push(textEditor(q.parts || [], d, 'Your answer'));
+    if (q.kind === 'text' && state.desk) out.push(deskBox(q, d));
+    else if (q.kind === 'text') out.push(textEditor(q.parts || [], d, 'Your answer'));
     if (q.kind === 'choice' && q.text) out.push(textEditor(q.text.parts || [], d, q.text.prompt));
 
     const err = h('span', { class: 'err' });
@@ -297,6 +389,7 @@ export function createSheet({ send, room, layout, panels }) {
       button.disabled = true;
       err.textContent = '';
       try {
+        if (state.desk) await sendDraft(); // the desk's answer is its draft: send the last keys first
         if (q.kind === 'code') {
           const result = await runChecks(d.text, q.tests);
           d.passed = result.passed;
@@ -382,12 +475,14 @@ export function createSheet({ send, room, layout, panels }) {
    * The box for a written answer (see editors.js). If the question names parts,
    * a button per part wraps the selected text as ==①...==, shown tinted in the box.
    */
-  function textEditor(parts, d, label) {
+  function textEditor(parts, d, label, shared = null) {
     const editor = proseEditor({
-      value: d.text,
+      value: shared ? shared.value : d.text,
       label,
+      readOnly: !!shared?.readOnly,
       onChange: (text) => {
-        d.text = text;
+        if (shared) shared.onChange(text);
+        else d.text = text;
       },
       // How the answer was written (time spent typing, how much was pasted). The teacher
       // sees it as a prompt to ask about the answer; it never changes a score.
@@ -401,7 +496,8 @@ export function createSheet({ send, room, layout, panels }) {
       },
     });
     const wrap = h('div');
-    if (parts.length) {
+    if (shared) deskEditor = editor;
+    if (parts.length && !shared?.readOnly) {
       const buttons = parts.map((part, i) =>
         h(
           'button',
@@ -552,5 +648,5 @@ export function createSheet({ send, room, layout, panels }) {
   });
   $('#retry').onclick = startRetry;
 
-  return { render, tick, standingAt, pressEnter };
+  return { render, tick, standingAt, pressEnter, deskText };
 }

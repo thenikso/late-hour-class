@@ -9,7 +9,8 @@
 //
 // How clients talk to the server:
 //   GET  /events                 a server-sent events stream: `state` (the client's view, on every
-//                                change), `pos` (positions, ten times a second), `fx`, `ball`, `kicked`
+//                                change), `pos` (positions, ten times a second), `fx`, `ball`, `kicked`,
+//                                `desk` (a shared desk draft: to that desk and the teacher only)
 //   POST /api/join               a student enters; the reply holds their token
 //   POST /api/<action>           a student's intention, with their token (see STUDENT_ACTIONS)
 //   POST /api/teacher/<action>   the teacher's controls, with the key from the teacher link
@@ -28,6 +29,7 @@ import { loadTerm } from './lib/term.js';
 import { sessionReport } from './lib/report.js';
 import { cliMissing } from './lib/ai.js';
 import { Game } from './lib/game.js';
+import { membersAt } from './lib/desks.js';
 
 const ROOT = dirname(fileURLToPath(import.meta.url));
 const PUBLIC = join(ROOT, 'public');
@@ -44,6 +46,12 @@ const STUDENT_ACTIONS = {
     return { ok: true };
   },
   answer: (game, p, b) => ({ ok: true, state: game.submit(p, b).state }),
+  // shared desk drafts in pair work (lib/desks.js)
+  draft: (game, p, b) => ({ ok: true, v: game.writeDraft(p, b) }),
+  pen: (game, p) => {
+    game.takePen(p);
+    return { ok: true };
+  },
   ask: (game, p, b) => ({ ok: true, status: game.ask(p, b.text).status }),
   vote: (game, p, b) => {
     game.voteAsk(p, b.id);
@@ -236,6 +244,13 @@ export async function start(opts = {}) {
     }
   });
   game.onFx((event) => pushAll('fx', event));
+  // A desk's draft goes to the students at that desk and to the teacher, nobody else.
+  game.onDesk((n, data) => {
+    const here = new Set(membersAt(game, n).map((p) => p.id));
+    for (const c of [...clients]) {
+      if (c.role === 'teacher' || (c.role === 'student' && here.has(c.player.id))) push(c, 'desk', data);
+    }
+  });
 
   // The fast tick: the ball and everyone's position, only when something moved.
   let lastPositions = '';

@@ -96,6 +96,7 @@ function start() {
       },
       onPos: (list) => room.setPositions(list),
       onBall: ([x, y]) => room.setBall(x, y),
+      onDesk: (d) => sheet.deskText(d),
       onFx,
       onGone(why) {
         store.del('cge-token');

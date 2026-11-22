@@ -51,7 +51,7 @@ export async function post(path, body = {}) {
 }
 
 /** Live connection: full state on every change, positions ten times a second. */
-export function connect(query, { onState, onPos, onGone, onStatus, onFx, onBall }) {
+export function connect(query, { onState, onPos, onGone, onStatus, onFx, onBall, onDesk }) {
   let es;
   let dead = false;
   const open = () => {
@@ -60,6 +60,7 @@ export function connect(query, { onState, onPos, onGone, onStatus, onFx, onBall 
     es.addEventListener('pos', (e) => onPos && onPos(JSON.parse(e.data)));
     es.addEventListener('fx', (e) => onFx && onFx(JSON.parse(e.data)));
     es.addEventListener('ball', (e) => onBall && onBall(JSON.parse(e.data)));
+    es.addEventListener('desk', (e) => onDesk && onDesk(JSON.parse(e.data)));
     es.addEventListener('kicked', () => {
       dead = true;
       es.close();

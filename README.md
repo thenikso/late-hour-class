@@ -68,7 +68,7 @@ The flags next to answers (short, unmarked parts, mostly pasted, written very fa
 - **code:** the code bench. Students write JavaScript and run it against the lesson's checks. The code runs only in their own browser; you see the code next to the ticks.
 - **text:** a written answer. If the question names parts, students mark them in their text with buttons that write `==①…==` (shown as a tinted span with a numbered badge; the `==` only appear while the cursor is on them); correctly marked parts raise the multiplier.
 
-Any question can be **pair work** (`"pairs": true`): students are put in twos and seated side by side, one hand-in counts for both, and it is scored once.
+Any question can be **pair work** (`"pairs": true`): students are put in twos and seated side by side, one hand-in counts for both, and it is scored once. A written pair question is **one shared draft per desk**: whoever holds the pen types, the others at the desk watch it appear and can click *Take the pen*. The draft belongs to the desk, so a student who moves to another desk sees and writes that desk's draft. Drafts go only to the students at that desk and to you; the teacher view shows every desk's draft as it is typed.
 
 ## Scoring, for fun
 
@@ -139,7 +139,7 @@ To run another deck: `node server.js --lesson <teacher deck url> --deck <student
 See [ARCHITECTURE.md](ARCHITECTURE.md) for a walkthrough of how a student action flows through the codebase.
 
 - `server.js`: HTTP server, live updates (server-sent events), student and teacher action tables, graceful shutdown.
-- `lib/`: room state (`game.js`), question lifecycle & pairs (`questions.js`), pure scoring (`scoring.js`), role views (`views.js`), the questions board (`asks.js`), atomic persistence (`session.js`, `term.js`), the report (`report.js`), the lesson reader (`manifest.js`), quick checks (`checks.js`), AI scoring (`ai.js`).
+- `lib/`: room state (`game.js`), question lifecycle & pairs (`questions.js`), shared desk drafts (`desks.js`), rapid rounds (`rapid.js`), pure scoring (`scoring.js`), role views (`views.js`), the questions board (`asks.js`), atomic persistence (`session.js`, `term.js`), the report (`report.js`), the lesson reader (`manifest.js`), quick checks (`checks.js`), AI scoring (`ai.js`).
 - `public/js/shared/`: pure modules imported by both Node and the browser — `world.js`, `things.js`, `rooms.js`, `path.js`, `fun.js`, `marks.js`, `util.js`.
 - `public/`: the three pages (student, teacher, projector), room art & rendering (`room-shell.js`, `room.js`, `sprites.js`), QR join code (`qr.js`), CodeMirror wrappers (`editors.js`), code bench sandbox (`code-bench.js`), and styles.
 - `public/assets/`: the office tileset and the 8 avatar sheets, from The Agency (CC0 1.0, see `public/assets/LICENSE.md`).

@@ -68,6 +68,7 @@ connect(
     },
     onPos: (list) => room.setPositions(list),
     onBall: ([x, y]) => room.setBall(x, y),
+    onDesk: (d) => questionPanel.deskText(d),
     onFx: (ev) => room.fx(ev),
     onGone: () => alertBar('Wrong teacher key: use the link printed when the server started.'),
     onStatus(ok) {

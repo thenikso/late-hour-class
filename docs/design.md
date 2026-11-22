@@ -297,7 +297,7 @@ Added on 16 November 2026, to complete the game:
 
 - Rooms as data, with solid furniture. Every thing has a collision box (seeded from The Agency's own shapes); avatars walk around desks and are drawn in front of or behind them. Tap or click the floor to walk there (A* path-finding).
 - Adventure rooms and shared doors (v2): an open floor and a workshop besides the classroom. The door opens for a countdown, the class walks through together, the rest are moved along. A question or a slide names its room; "Take your seat" is the walk back. Rooms are generic rather than themed per exercise, and there are no optional side rooms.
-- Pair up (v3): `pairs: true` on any question; pairs sit side by side, one hand-in counts for both and is scored once. The answer box is not edited live by both.
+- Pair up (v3): `pairs: true` on any question; pairs sit side by side, one hand-in counts for both and is scored once. A written answer is one shared draft per desk, with a pen: one student types at a time, the others watch live and can take the pen (no merging needed). The draft belongs to the desk, not the student.
 - Spot the bug and the code bench (v3): `bug` and `code` question kinds. Student code runs in a Web Worker in the student's own browser.
 - Slides talking to the game (v3): `classGame.open/timer/trophy/room` from a deck on the projector.
 - Trophy art redrawn with codex, like the other fun sheets.

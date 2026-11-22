@@ -519,7 +519,11 @@ test('pair work assigns Driver/Navigator, seats pairs and trios, and scores once
 
     const token = students.find((s) => s.id === first.id).token;
     const text = 'The queue keeps requests in order, which explains clearly why the second click waits for the first one to finish.';
-    await post('/api/answer', { token, text, meta: { activeMs: 60000 } });
+    // Written pair work is one shared draft per desk: write it, then hand it in.
+    await post('/api/draft', { token, text, meta: { activeMs: 60000 } });
+    const mateToken = students.find((s) => s.id === mate.id).token;
+    await assert.rejects(post('/api/draft', { token: mateToken, text: 'no' }), /has the pen/);
+    await post('/api/answer', { token });
     assert.equal(game.studentView(mate).mine.text, text);
     assert.equal(game.studentView(mate).mine.by, first.name);
     assert.equal(game.teacherView().answers.length, 1);

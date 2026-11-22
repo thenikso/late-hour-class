@@ -131,3 +131,6 @@
 .sheet .rapid-verdict { font-weight: bold; margin: 6px 0 2px; }
 .sheet .rapid-clock { font-size: 28px; color: var(--gold); }
 .sheet .rapid-clock.low { color: var(--warn); }
+/* A shared desk draft: who is here and who has the pen; a dimmer box while a partner writes. */
+.sheet .desk-bar { justify-content: space-between; }
+.sheet .editor.watching { opacity: 0.85; }

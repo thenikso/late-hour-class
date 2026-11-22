@@ -155,6 +155,7 @@ export function createQuestionPanel({ act, alertBar, seatSeconds }) {
 
     const sig = JSON.stringify([
       q,
+      s.desks?.map((d) => [d.n, d.members, d.penName]), // the text streams in by itself
       s.answers,
       s.picks,
       s.spotlight?.pid || null,
@@ -290,10 +291,46 @@ export function createQuestionPanel({ act, alertBar, seatSeconds }) {
       );
     }
     wrap.append(statsView(q));
+    if (s.desks) wrap.append(desksView(s));
 
     const picks = s.picks || { good: [], check: [] };
     wrap.append(h('ul', { class: 'answers' }, s.answers.map((a) => answerItem(s, q, a, picks))));
     return wrap;
+  }
+
+  // ---- shared desk drafts (written pair work): every desk's text, as it is typed -------------
+
+  const deskTexts = new Map(); // `${question}:${desk}` -> { text, v }: the newest we have heard of
+
+  function newestDraft(key, d) {
+    const id = `${key}:${d.n}`;
+    const known = deskTexts.get(id);
+    if (!known || d.v > known.v) deskTexts.set(id, { text: d.text, v: d.v });
+    return deskTexts.get(id).text;
+  }
+
+  function desksView(s) {
+    const box = h('div', { class: 'desks' }, h('strong', {}, 'Desks'));
+    for (const d of s.desks) {
+      const names = d.members.map((m) => m.name).join(', ') || 'nobody there now';
+      const pen = d.penName ? ` · ✎ ${d.penName}` : '';
+      box.append(
+        h(
+          'div',
+          { class: 'desk', id: `desk-${d.n}` },
+          h('div', { class: 'quiet' }, `Desk ${d.n + 1}: ${names}${pen}`),
+          h('div', { class: 'draft' }, newestDraft(s.question.key, d) || '…'),
+        ),
+      );
+    }
+    return box;
+  }
+
+  /** A `desk` event: someone typed. Only that desk's text changes on the page. */
+  function deskText(d) {
+    const text = newestDraft(d.key, d);
+    const el = document.querySelector(`#desk-${d.n} .draft`);
+    if (el) el.textContent = text || '…';
   }
 
   /** How the class answered: a bar per option, per grid row, or along the opinion line. */
@@ -482,5 +519,5 @@ export function createQuestionPanel({ act, alertBar, seatSeconds }) {
     return li;
   }
 
-  return { render };
+  return { render, deskText };
 }

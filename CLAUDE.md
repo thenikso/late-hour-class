@@ -15,7 +15,7 @@ npm run example:mock   # Week 8 example with fake offline scoring (no AI)
 npm run example        # same, scoring with the local `claude` CLI
 npm run demo           # every question kind, the three rooms and trophies, from example/demo-lesson.json (mock AI)
 npm run week10         # "The weakest link": 30-minute after-midterm lesson, example/week-10-weakest-link.json (no deck)
-npm test               # node:test, isolated unit + HTTP integration tests (39 tests across 7 files)
+npm test               # node:test, isolated unit + HTTP integration tests (44 tests across 8 files)
 npm run report         # Markdown report of the newest session in data/ (add a file, or --names)
 npm start -- --lesson <deck url> --deck <student deck url> --projector <deck url> --notes "<deck url>?view=notes"
 node tools/serve-slides.js <lectures folder>   # student copy on :3001 (LAN), full copy on :3002 (localhost)
@@ -44,9 +44,10 @@ The Monocraft font is committed in `public/fonts/`; there is no download step.
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for the student-facing tour.
 
-- `server.js`: `node:http` server. `GET /events` is a server-sent events stream per client (`state`, `pos`, `fx`, `ball`, `kicked`). Actions are two tables: `STUDENT_ACTIONS` (`POST /api/<action>` with a token) and `TEACHER_ACTIONS` (`POST /api/teacher/<action>?key=…`). `GET /report?key=…` is the session report. Also serves `public/`. `start(opts)` is exported for tests (supports `port: 0`).
+- `server.js`: `node:http` server. `GET /events` is a server-sent events stream per client (`state`, `pos`, `fx`, `ball`, `kicked`). SSE also carries `desk` (a shared desk draft, only to that desk and the teacher). Actions are two tables: `STUDENT_ACTIONS` (`POST /api/<action>` with a token) and `TEACHER_ACTIONS` (`POST /api/teacher/<action>?key=…`). `GET /report?key=…` is the session report. Also serves `public/`. `start(opts)` is exported for tests (supports `port: 0`).
 - `lib/game.js`: the `Game` class: players (including teacher-unlocked rejoin), rooms and the shared door (`openDoor`, `goThrough`, `arrive`, `enter`), room modes (`free`, `seating`, `present`, `question`, `review`), the shared screen, ball physics, spotlight/hot seat, trophies, totals.
 - `lib/rapid.js`: rapid rounds: the clock that moves through the lines (`startRapid`, `stepRapid`), locking each line from where players stand, and each student's own zone order (`rapidOrder`).
+- `lib/desks.js`: shared desk drafts for written pair work: which desk a player is at (`deskAt`, from the server position), the pen (`writeDraft`, `takePen`), who a desk's hand-in counts for (`deskGroup`). Live text goes as `desk` events to that desk and the teacher only.
 - `lib/questions.js`: the question life cycle (`open`, `submit`, `close`, `score`, `setScore`, `reveal`, `showExample`, `setTimer`), pair work (`makePairs`, `groupOf`), the submit gate (`checkGate`, `GateError`), pending retry counts and hand-in streaks.
 - `lib/scoring.js`: pure functions: `needsAi`, `autoScore`, `canRetry` (written + code bench), `breakdown` and the `POINTS` table.
 - `lib/views.js`: `studentView`, `teacherView`, `screenView`. `baseView` is what everyone gets; anything private is added in `teacherView` or under `me` / `mine`. The projector answer wall is anonymous by default (`wallNames: false`).
@@ -93,7 +94,7 @@ A deck becomes game-ready with a `<script type="application/json" id="game-lesso
 - `rapid`: `options` (2–4, the floor zones), `rows` (`{text, correct}`), `seconds` per line (default 10), `scramble` (default true: every student gets their own zone order, new on every line). Runs by itself: intro, then each line, then its answer for 3 seconds; closes itself after the last line. The one exception to "nothing closes by itself". Stored and scored like a grid.
 - `bug`: `code`, `correct` (line number or list, from 1). `code`: `starter`, `tests` (`[{ name, check }]`, each check a JavaScript expression that must be true).
 - `line`: `labels` (the two ends). Always unscored; the answer is where the student stands (0–100).
-- Any kind: `title`, `context`, `stretch` (optional extra challenge for early finishers), `scored: false` for unscored polls, `room` (`floor` or `lab`: the door opens first), `pairs: true` (one answer per pair).
+- Any kind: `title`, `context`, `stretch` (optional extra challenge for early finishers), `scored: false` for unscored polls, `room` (`floor` or `lab`: the door opens first), `pairs: true` (one answer per pair; a `text` pair question is one shared draft per desk, see `lib/desks.js`).
 
 Next to `questions`, `trophies`: `[{ after, name, sprite, text, example, slide }]` (see `normaliseTrophy`).
 

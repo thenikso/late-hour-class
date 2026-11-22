@@ -35,6 +35,8 @@ server.js                     HTTP server, SSE stream, action dispatch, graceful
 lib/                          Server-only rules and I/O
   game.js                     Room state, players, doors, seating, ball, spotlight, trophies
   questions.js                Question lifecycle, submit gate, pair work, retries, streaks
+  desks.js                    Shared desk drafts in written pair work: one pen per desk
+  rapid.js                    Rapid rounds: timed lines answered by standing in a zone
   scoring.js                  Pure scoring functions (chips x multiplier, retry eligibility)
   views.js                    Role-specific JSON projections (student / teacher / screen)
   checks.js                   Fast non-punitive answer flags (short, unmarked, pasted, similar)
