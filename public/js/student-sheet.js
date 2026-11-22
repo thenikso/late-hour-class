@@ -4,7 +4,8 @@
 // Question kinds: text (with optional marked parts), choice (walk into a zone
 // or pick), grid (one pick per row), line (stand somewhere between two ends),
 // bug (click the faulty line) and code (write and run JavaScript); the last
-// two have their editors in code-bench.js.
+// two have their editors in code-bench.js. A rapid round shows one line at a
+// time: you answer by standing in a zone when its time runs out.
 
 import { $, h, store, scoreShow, celebrate, clock } from './common.js';
 import { zoneAt, lineValue, LETTERS, CIRCLED } from './shared/world.js';
@@ -85,6 +86,9 @@ export function createSheet({ send, room, layout, panels }) {
       mine?.value,
       mine?.passed,
       mine?.by,
+      q.row,
+      q.phase,
+      q.order,
       editing,
       !!q.example,
       mates,
@@ -125,13 +129,46 @@ export function createSheet({ send, room, layout, panels }) {
         el.append(h('p', { class: 'pair' }, `Pair with ${mates.join(' and ')}. ${roleNote}`));
       }
       const canEdit = (q.status === 'open' && (!mine || editing)) || (q.status === 'revealed' && editing && mine?.canRetry);
-      el.append(...(canEdit ? editor(q, mine) : summary(q, mine)));
+      if (q.kind === 'rapid' && q.status === 'open') el.append(...rapidPanel(q, mine));
+      else el.append(...(canEdit ? editor(q, mine) : summary(q, mine)));
       if (q.example) {
         el.append(h('p', { class: 'quiet small' }, 'One sound answer:'), h('div', { class: 'feedback' }, q.example));
       }
     }
     tick();
     maybeShowResult();
+  }
+
+  /**
+   * A rapid round while it runs: the line, your zones (in your own order), the clock,
+   * and for a moment after each line its answer. Nothing to click: where you stand counts.
+   */
+  function rapidPanel(q, mine) {
+    const out = [];
+    const n = q.rows.length;
+    if (q.phase === 'ready') {
+      out.push(h('p', { class: 'rapid-line' }, `${n} lines, ${q.seconds} seconds each. Get ready…`));
+    } else {
+      out.push(h('p', { class: 'quiet small' }, `Line ${q.row + 1} of ${n}`), h('p', { class: 'rapid-line' }, q.rows[q.row].text));
+    }
+    const list = h('ul', { class: 'options', id: 'zone-list' });
+    q.order.forEach((opt, pos) => {
+      list.append(h('li', { 'data-pos': pos }, h('span', { class: 'letter' }, LETTERS[pos]), q.options[opt]));
+    });
+    out.push(list);
+    if (q.phase === 'show' && q.rowAnswer) {
+      const right = [].concat(q.rowAnswer);
+      const pick = mine?.grid?.[q.row];
+      const answer = right.map((i) => q.options[i]).join(' or ');
+      let verdict = `You weren't in a zone this time. The answer: ${answer}.`;
+      if (isSet(pick)) verdict = right.includes(pick) ? `✓ Right: ${answer}.` : `✗ You picked ${q.options[pick]}. The answer: ${answer}.`;
+      out.push(h('p', { class: 'rapid-verdict' }, verdict));
+      out.push(h('p', { class: 'quiet small' }, `${q.rowTally.right} of ${q.rowTally.answered} got it.`));
+    } else {
+      out.push(h('p', { class: 'quiet', id: 'stand-hint' }));
+    }
+    out.push(h('div', { class: 'row' }, h('span', { class: 'rapid-clock', id: 'rapid-clock' })));
+    return out;
   }
 
   /** After handing in (or when the question is closed): what you answered, and what you can do next. */
@@ -207,7 +244,7 @@ export function createSheet({ send, room, layout, panels }) {
       box.append(h('div', {}, `${LETTERS[q.order.indexOf(mine.choice)]} · ${q.options[mine.choice]}`));
       if (q.reasons && isSet(mine.reason)) box.append(h('div', {}, `Reason: ${q.reasons.options[mine.reason]}`));
     }
-    if (q.kind === 'grid' && mine.grid) {
+    if ((q.kind === 'grid' || q.kind === 'rapid') && mine.grid) {
       q.rows.forEach((row, i) => {
         box.append(h('div', {}, `${i + 1}. ${(row.options || q.options)[mine.grid[i]] ?? '—'}`));
       });
@@ -407,6 +444,13 @@ export function createSheet({ send, room, layout, panels }) {
   /** The hand-in counter and the soft timer. */
   function tick() {
     const q = state?.question;
+    const rapidClock = $('#rapid-clock');
+    if (q?.kind === 'rapid' && rapidClock) {
+      const left = q.phaseEndsAt ? Math.max(0, Math.ceil((q.phaseEndsAt - (Date.now() + room.skew)) / 1000)) : 0;
+      const text = { ready: `First line in ${left}`, answer: `${left}`, show: `Next in ${left}` }[q.phase] || '';
+      if (rapidClock.textContent !== text) rapidClock.textContent = text;
+      rapidClock.classList.toggle('low', q.phase === 'answer' && left <= 3);
+    }
     const count = $('#live-count');
     if (!q || !count) return;
     const left = q.timerEndsAt ? q.timerEndsAt - (Date.now() + room.skew) : null;
@@ -430,6 +474,11 @@ export function createSheet({ send, room, layout, panels }) {
     let text;
     if (q.kind === 'line') {
       text = `Walk left or right, then press Enter or the button. Now: ${lineText(q, lineValue(x))}`;
+    } else if (q.kind === 'rapid') {
+      const zone = zoneAt(q.order.length, x, y);
+      const ready = q.phase === 'ready' ? 'Zones move around on every line, so read them each time.' : 'It locks in when the time runs out.';
+      text = zone < 0 ? `Walk into the zone of your answer. ${ready}` : `You're in ${LETTERS[zone]} · ${q.options[q.order[zone]]}. ${ready}`;
+      document.querySelectorAll('#zone-list li').forEach((li) => li.classList.toggle('here', Number(li.dataset.pos) === zone));
     } else {
       const zone = zoneAt(q.order.length, x, y);
       text =

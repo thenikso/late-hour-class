@@ -257,6 +257,8 @@ function renderQbar() {
     return;
   }
   bar.hidden = false;
+  bar.classList.toggle('rapid', q.kind === 'rapid');
+  if (q.kind === 'rapid') return renderRapid(q, bar);
   const allIn = q.status === 'open' && q.online > 0 && q.submitted >= q.online;
   if (allIn && !wasAllIn) {
     // The whole room handed in: a small party, and the team bonus is theirs.
@@ -284,6 +286,56 @@ function renderQbar() {
     lastCount = q.submitted;
   }
 }
+
+/**
+ * A rapid round on the projector: the intro stays up and the current line sits under it,
+ * big, with its clock. The zones on the floor carry no words here: every student
+ * sees the options in their own order on their laptop.
+ */
+function renderRapid(q, bar) {
+  const n = q.rows.length;
+  let line = `${n} lines, ${q.seconds} seconds each. Look at your laptop: your zones are your own.`;
+  let after = '';
+  if (q.status !== 'open') line = 'Done! The results are coming.';
+  else if (q.phase !== 'ready') line = q.rows[q.row].text;
+  if (q.status === 'open' && q.phase === 'show' && q.rowAnswer) {
+    after = `${[].concat(q.rowAnswer).map((i) => q.options[i]).join(' or ')} · ${q.rowTally.right} of ${q.rowTally.answered} got it`;
+  }
+  const label = q.status !== 'open' ? '' : q.phase === 'ready' ? 'Get ready' : `Line ${q.row + 1} of ${n}`;
+  bar.innerHTML = '';
+  bar.append(
+    h(
+      'div',
+      { class: 'text' },
+      h('h2', {}, q.title),
+      h('p', {}, q.prompt),
+      q.context ? h('p', { class: 'quiet' }, q.context) : '',
+      h('div', { class: 'rapid-label' }, label),
+      h('div', { class: 'rapid-line' }, line),
+      after ? h('div', { class: 'rapid-answer' }, `✓ ${after}`) : '',
+    ),
+    h('div', { class: 'count' }, h('span', { id: 'qclock' }), h('small', {}, q.options.join(' · '))),
+  );
+  tickRapid();
+}
+
+/** The rapid round's clock, between server updates; a blip on the last three seconds of a line. */
+let lastBlip = null;
+function tickRapid() {
+  const q = state?.question;
+  const el = $('#qclock');
+  if (!el || q?.kind !== 'rapid' || q.status !== 'open' || !q.phaseEndsAt) {
+    if (el) el.textContent = '';
+    return;
+  }
+  const left = Math.max(0, Math.ceil((q.phaseEndsAt - state.serverNow - (performance.now() - renderedAt)) / 1000));
+  if (el.textContent !== String(left)) el.textContent = left;
+  el.classList.toggle('low', q.phase === 'answer' && left <= 3);
+  const blip = `${q.row}:${q.phase}:${left}`;
+  if (q.phase === 'answer' && left <= 3 && left > 0 && blip !== lastBlip) sound.blip(left * 2);
+  lastBlip = blip;
+}
+setInterval(tickRapid, 250);
 
 function renderWall() {
   const q = state.question;
@@ -318,7 +370,7 @@ function renderWall() {
       );
     });
   }
-  if (q.kind === 'grid' && q.rowStats) {
+  if ((q.kind === 'grid' || q.kind === 'rapid') && q.rowStats) {
     q.rows.forEach((r, i) => {
       const opts = r.options || q.options;
       const right = q.rowCorrect[i] || [];

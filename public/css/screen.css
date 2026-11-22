@@ -71,3 +71,11 @@ body.full .screen-frame { z-index: 35; }
 .code-lines { padding-left: 40px; background: var(--bg2); }
 .code-lines code, pre.code { margin: 4px 0; }
 .code-lines b { color: var(--gold); }
+/* A rapid round: the intro, then one big line at a time with its clock. */
+.qbar.rapid { right: 12px; bottom: 44px; max-width: none; align-items: flex-end; }
+.qbar.rapid .rapid-label { margin-top: 10px; color: var(--quiet); font-size: 16px; }
+.qbar.rapid .rapid-line { font-size: 32px; line-height: 1.25; margin: 2px 0; }
+.qbar.rapid .rapid-answer { font-size: 22px; color: var(--good); }
+.qbar.rapid .count { min-width: 140px; }
+.qbar.rapid #qclock { font-size: 72px; }
+.qbar.rapid #qclock.low { color: var(--warn); }

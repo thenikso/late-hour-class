@@ -207,7 +207,8 @@ export class Room {
 
     // On the floor and the wall, under everything that stands.
     const q = this.state?.question;
-    const zoneQ = q?.kind === 'choice' && q.zones ? q : null;
+    const rapidQ = q?.kind === 'rapid' && q.status === 'open' ? q : null;
+    const zoneQ = (q?.kind === 'choice' && q.zones) || rapidQ ? q : null;
     const lineQ = q?.kind === 'line' ? q : null;
     if (zoneQ) this.drawZones(zoneQ, t);
     if (lineQ) this.drawLine(lineQ);
@@ -559,11 +560,15 @@ export class Room {
 
   drawZones(q, t) {
     const g = this.g;
-    const revealed = q.status === 'revealed';
-    const correct = revealed && q.correct !== null && q.correct !== undefined ? [].concat(q.correct) : [];
-    zones(q.order.length).forEach((z, i) => {
+    // A rapid round lights up each line's answer for a moment. Its zone order is the
+    // student's own: the projector has none, so it never lights a zone.
+    const order = q.order || q.options.map((_, i) => i);
+    const revealed = q.kind === 'rapid' ? q.phase === 'show' && !!q.order : q.status === 'revealed';
+    const answer = q.kind === 'rapid' ? q.rowAnswer : q.correct;
+    const correct = revealed && answer !== null && answer !== undefined ? [].concat(answer) : [];
+    zones(order.length).forEach((z, i) => {
       const color = ZONE_COLORS[i % ZONE_COLORS.length];
-      const right = correct.includes(q.order[i]);
+      const right = correct.includes(order[i]);
       // After the reveal the right zone glows green and the others fade.
       g.globalAlpha = revealed ? (right ? 0.4 + 0.1 * Math.sin(t / 150) : 0.1) : 0.26;
       g.fillStyle = right ? '#5ee08a' : color;
@@ -578,6 +583,7 @@ export class Room {
   }
 
   drawZoneLabels(q) {
+    if (!q.order) return; // a rapid round on the projector: every student has their own labels
     const g = this.g;
     const s = this.scale;
     zones(q.order.length).forEach((z, i) => {

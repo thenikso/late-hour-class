@@ -162,7 +162,7 @@ The fast pass could also use a hosted decision model. Jev (TypeSafe AI) is built
 
 Flags such as "possibly AI" or "pasted" are a reason to ask the student about their answer in class, never a penalty on their own. These signals are unreliable, and a wrong accusation costs more than a missed one.
 
-Multiple choice, zone and grid answers are scored automatically, with no AI.
+Multiple choice, zone, grid and rapid answers are scored automatically, with no AI.
 
 Rewards are cosmetic: hats, colours, pets, a desk decoration, unlocked at point thresholds over the term. Points carry over between lessons so a bad day is not final.
 

@@ -187,8 +187,12 @@ export function createQuestionPanel({ act, alertBar, seatSeconds }) {
     );
     const open = q.status === 'open';
     const writing = q.waitingFor.length;
-    if (open && writing) wrap.append(h('p', { class: 'waiting' }, `Waiting for: ${q.waitingFor.join(', ')}`));
-    if (open && !writing && q.online > 0) wrap.append(h('p', { class: 'ok' }, 'Everyone is in. You can close.'));
+    if (open && q.kind === 'rapid') {
+      // A rapid round runs by itself; Close stops it early.
+      const where = q.phase === 'ready' ? 'Intro up, first line soon' : `Line ${q.row + 1} of ${q.rows.length} (${q.phase === 'show' ? 'showing the answer' : 'answering'})`;
+      wrap.append(h('p', { class: 'quiet' }, `${where}. It moves on by itself and closes after the last line.`));
+    } else if (open && writing) wrap.append(h('p', { class: 'waiting' }, `Waiting for: ${q.waitingFor.join(', ')}`));
+    if (open && !writing && q.online > 0 && q.kind !== 'rapid') wrap.append(h('p', { class: 'ok' }, 'Everyone is in. You can close.'));
     if (q.fullHouse) wrap.append(h('p', { class: 'ok' }, 'Everyone handed in: +10 each at the reveal.'));
 
     const row = h('div', { class: 'row' });
@@ -197,7 +201,7 @@ export function createQuestionPanel({ act, alertBar, seatSeconds }) {
       row.append(h('button', { class: 'btn hot', onclick: () => act('close', { force: true }) }, `Close anyway (${writing} still writing)`));
     }
     if (open && !writing) {
-      row.append(h('button', { class: 'btn go', onclick: () => act('close') }, 'Close'));
+      row.append(h('button', { class: 'btn go', onclick: () => act('close') }, q.kind === 'rapid' ? 'Stop early' : 'Close'));
     }
     if (!open && q.needsAi) {
       const retries = q.pendingRetries || 0;
@@ -312,7 +316,7 @@ export function createQuestionPanel({ act, alertBar, seatSeconds }) {
         );
       });
     }
-    if (q.kind === 'grid') {
+    if (q.kind === 'grid' || q.kind === 'rapid') {
       q.rows.forEach((row, i) => {
         const right = q.rowCorrect[i] || [];
         box.append(
@@ -394,7 +398,7 @@ export function createQuestionPanel({ act, alertBar, seatSeconds }) {
         body.append(h('div', { class: 'quiet' }, `Reason: ${def.reasons.options[a.reason]}`, tick(a.auto?.reason)));
       }
     }
-    if (def.kind === 'grid' && a.grid) {
+    if ((def.kind === 'grid' || def.kind === 'rapid') && a.grid) {
       body.append(
         h(
           'div',

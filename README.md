@@ -62,6 +62,7 @@ The flags next to answers (short, unmarked parts, mostly pasted, written very fa
 
 - **choice:** students walk into the zone of their answer (or click, with `"zones": false`). Options can be shuffled, can carry a "because ①②③" reason, and can have a written follow-up. With `"correct": null` it is a poll.
 - **grid:** a row of buttons per line, like the tick boxes on a worksheet. Each row can have its own options and more than one accepted answer.
+- **rapid:** a grid answered on the floor, one line at a time. The intro and the current line are on the projector; students stand in a zone before the clock runs out (`"seconds"` per line, 10 by default), see the right answer for a moment, and the next line comes up by itself. The round closes itself after the last line; you still reveal the points. Each student sees the options in their own zones, shuffled again on every line, so following the crowd doesn't help (`"scramble": false` turns that off). Not standing in a zone costs nothing.
 - **line:** an opinion line. Students stand anywhere between two ends ("Disagree" … "Agree"); the result is the spread across the room. Never right or wrong.
 - **bug:** spot the bug. Students click the faulty line of a piece of code; you see who found it and how fast.
 - **code:** the code bench. Students write JavaScript and run it against the lesson's checks. The code runs only in their own browser; you see the code next to the ticks.
@@ -71,7 +72,7 @@ Any question can be **pair work** (`"pairs": true`): students are put in twos an
 
 ## Scoring, for fun
 
-Chips × multiplier, counted up on screen. Handing in is worth 10; a right choice or the right line of a bug 30 (half right 15); a right reason 15; 10 per right grid row or passing check; the AI or teacher score is worth 15 per point (0–3). Each correctly marked part adds ×0.5.
+Chips × multiplier, counted up on screen. Handing in is worth 10; a right choice or the right line of a bug 30 (half right 15); a right reason 15; 10 per right grid or rapid row, or passing check; the AI or teacher score is worth 15 per point (0–3). Each correctly marked part adds ×0.5.
 
 Two bonuses reward showing up rather than being right: handing in several questions in a row (+5 for each one in the run, up to +25), and +10 for everyone when the whole room hands in before you close. Missing a question costs nothing.
 

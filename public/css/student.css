@@ -126,3 +126,8 @@
 .editor .cm-scroller { overflow: auto; }
 .mark-badge { font-size: 0.85em; margin-right: 2px; }
 @media (min-width: 1000px) { .editor.prose .cm-editor { min-height: 190px; } }
+/* A rapid round: one line at a time, a big clock. */
+.sheet .rapid-line { font-size: 17px; margin: 4px 0 8px; color: var(--ink); }
+.sheet .rapid-verdict { font-weight: bold; margin: 6px 0 2px; }
+.sheet .rapid-clock { font-size: 28px; color: var(--gold); }
+.sheet .rapid-clock.low { color: var(--warn); }

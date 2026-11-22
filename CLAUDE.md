@@ -15,7 +15,7 @@ npm run example:mock   # Week 8 example with fake offline scoring (no AI)
 npm run example        # same, scoring with the local `claude` CLI
 npm run demo           # every question kind, the three rooms and trophies, from example/demo-lesson.json (mock AI)
 npm run week10         # "The weakest link": 30-minute after-midterm lesson, example/week-10-weakest-link.json (no deck)
-npm test               # node:test, isolated unit + HTTP integration tests (35 tests across 6 files)
+npm test               # node:test, isolated unit + HTTP integration tests (39 tests across 7 files)
 npm run report         # Markdown report of the newest session in data/ (add a file, or --names)
 npm start -- --lesson <deck url> --deck <student deck url> --projector <deck url> --notes "<deck url>?view=notes"
 node tools/serve-slides.js <lectures folder>   # student copy on :3001 (LAN), full copy on :3002 (localhost)
@@ -46,6 +46,7 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for the student-facing tour.
 
 - `server.js`: `node:http` server. `GET /events` is a server-sent events stream per client (`state`, `pos`, `fx`, `ball`, `kicked`). Actions are two tables: `STUDENT_ACTIONS` (`POST /api/<action>` with a token) and `TEACHER_ACTIONS` (`POST /api/teacher/<action>?key=…`). `GET /report?key=…` is the session report. Also serves `public/`. `start(opts)` is exported for tests (supports `port: 0`).
 - `lib/game.js`: the `Game` class: players (including teacher-unlocked rejoin), rooms and the shared door (`openDoor`, `goThrough`, `arrive`, `enter`), room modes (`free`, `seating`, `present`, `question`, `review`), the shared screen, ball physics, spotlight/hot seat, trophies, totals.
+- `lib/rapid.js`: rapid rounds: the clock that moves through the lines (`startRapid`, `stepRapid`), locking each line from where players stand, and each student's own zone order (`rapidOrder`).
 - `lib/questions.js`: the question life cycle (`open`, `submit`, `close`, `score`, `setScore`, `reveal`, `showExample`, `setTimer`), pair work (`makePairs`, `groupOf`), the submit gate (`checkGate`, `GateError`), pending retry counts and hand-in streaks.
 - `lib/scoring.js`: pure functions: `needsAi`, `autoScore`, `canRetry` (written + code bench), `breakdown` and the `POINTS` table.
 - `lib/views.js`: `studentView`, `teacherView`, `screenView`. `baseView` is what everyone gets; anything private is added in `teacherView` or under `me` / `mine`. The projector answer wall is anonymous by default (`wallNames: false`).
@@ -78,7 +79,7 @@ Everything here is in `public/js/fun.js` (rules), `Game` (state) and `room.js` /
 - **Hats:** unlocked by a player's own points, or by improving an answer on a retry (the scholar cap). `POST /api/hat`; the server checks the unlock.
 - **Class goal:** everyone's points together, with thresholds per student (`CLASS_LEVELS`). Each level adds something to the room: fairy lights, a cat, the games corner (arcade machine and a ball to kick in free roam), a disco ball for results, a trophy. A level, once reached, stays (`classLevel` is saved in the session file).
 - **Streak and team bonus:** see Scoring below.
-- **Soft timer:** the teacher can show a countdown on an open question. Nothing closes by itself.
+- **Soft timer:** the teacher can show a countdown on an open question. Nothing closes by itself, except a `rapid` round, which the teacher starts and can stop early.
 - **Finale:** a teacher button; the projector shows a podium of three, "Improved today", the longest hand-in streak and the class totals.
 - The ball is simulated on the server (`Game.stepBall`, ten times a second) and sent as `ball` events.
 
@@ -89,13 +90,14 @@ A deck becomes game-ready with a `<script type="application/json" id="game-lesso
 - `text`: `prompt`, `parts` (named parts students mark as `==①…==`), `rubric`, `example`.
 - `choice`: `options`, `correct` (index, list, or `null` for a poll), `partial`, `zones` (default true: answer by standing in a floor zone), `shuffle`, `reasons` (`{options, correct}`), optional `text` follow-up (`{prompt, parts, rubric}`).
 - `grid`: `options`, `rows` (`{text, options?, correct}`; `correct` can be a list).
+- `rapid`: `options` (2–4, the floor zones), `rows` (`{text, correct}`), `seconds` per line (default 10), `scramble` (default true: every student gets their own zone order, new on every line). Runs by itself: intro, then each line, then its answer for 3 seconds; closes itself after the last line. The one exception to "nothing closes by itself". Stored and scored like a grid.
 - `bug`: `code`, `correct` (line number or list, from 1). `code`: `starter`, `tests` (`[{ name, check }]`, each check a JavaScript expression that must be true).
 - `line`: `labels` (the two ends). Always unscored; the answer is where the student stands (0–100).
 - Any kind: `title`, `context`, `stretch` (optional extra challenge for early finishers), `scored: false` for unscored polls, `room` (`floor` or `lab`: the door opens first), `pairs: true` (one answer per pair).
 
 Next to `questions`, `trophies`: `[{ after, name, sprite, text, example, slide }]` (see `normaliseTrophy`).
 
-Scoring lives in `lib/scoring.js` (`breakdown()`): handed in 10; a hand-in streak +5 per question in a row (up to +25); +10 each when everyone online handed in before the close; right choice (or bug line) 30, half 15; right reason 15; 10 per right grid row or passing check; AI/teacher score ×15 (0–3); +0.5 multiplier per correctly marked part. Retry is offered when the AI names something missed or scores under 2, or when a code bench check failed, up to 3 attempts. A question to the teacher that got a vote adds 5 to its author (up to 15).
+Scoring lives in `lib/scoring.js` (`breakdown()`): handed in 10; a hand-in streak +5 per question in a row (up to +25); +10 each when everyone online handed in before the close; right choice (or bug line) 30, half 15; right reason 15; 10 per right grid or rapid row, or passing check; AI/teacher score ×15 (0–3); +0.5 multiplier per correctly marked part. Retry is offered when the AI names something missed or scores under 2, or when a code bench check failed, up to 3 attempts. A question to the teacher that got a vote adds 5 to its author (up to 15).
 
 ## Art
 
