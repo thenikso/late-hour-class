@@ -30,7 +30,7 @@ let route = []; // spots still to walk through after a tap or click on the floor
 let looping = false; // prevents stacking multiple requestAnimationFrame loops after a rejoin
 
 const room = new Room($('#room'));
-const frame = screenFrame($('#screen'));
+const frame = screenFrame($('#screen'), $('#screen-card'));
 
 /** Send one of our intentions to the server. */
 const send = (action, body = {}) => post(`/api/${action}`, { token, ...body });
@@ -334,8 +334,9 @@ function layout() {
   // During a presentation the slides cover the room; otherwise they sit on the room's wall screen.
   const present = state?.mode === 'present';
   document.body.classList.toggle('present', present);
-  if (present) placeFrame($('#screen'), { left: 12 - left, top: 0, width: innerWidth - 24 - sheetW, height: availH - 8 });
-  else placeFrame($('#screen'), room.screenRect());
+  const r = present ? { left: 12 - left, top: 0, width: innerWidth - 24 - sheetW, height: availH - 8 } : room.screenRect();
+  placeFrame($('#screen'), r);
+  placeFrame($('#screen-card'), r);
 }
 addEventListener('resize', layout);
 

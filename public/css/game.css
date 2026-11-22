@@ -278,3 +278,14 @@ canvas.avatar { image-rendering: pixelated; }
 .code-lines li.wrong { background: #4a1f2c; border-left-color: var(--bad); }
 .code-lines li.picked { background: #4a3f12; border-left-color: var(--gold); }
 pre.code { background: #120d22; border-radius: 4px; padding: 6px 8px; margin: 4px 0; font-size: 13px; }
+
+/* The wall screen when there is no deck: the open question, drawn at 1280x720 and scaled like a slide. */
+.screen-card { pointer-events: none; background: var(--bg2); color: var(--ink); padding: 56px 72px; box-sizing: border-box; overflow: hidden; font-family: var(--font); }
+.screen-card h1 { margin: 0 0 24px; font-size: 52px; color: var(--gold); line-height: 1.15; }
+.screen-card p { margin: 0 0 20px; font-size: 32px; line-height: 1.35; white-space: pre-line; }
+.screen-card p.context { font-size: 26px; color: var(--quiet); }
+.screen-card p.line { font-size: 40px; color: var(--ink); }
+.screen-card p.quiet { color: var(--quiet); }
+.screen-card.long h1 { font-size: 40px; margin-bottom: 14px; }
+.screen-card.long p { font-size: 24px; margin-bottom: 12px; }
+.screen-card.long p.context { font-size: 21px; }

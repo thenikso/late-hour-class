@@ -10,7 +10,7 @@ import { qrCanvas } from './qr.js';
 
 const key = new URLSearchParams(location.search).get('key') || '';
 const room = new Room($('#room'));
-const frame = screenFrame($('#screen'));
+const frame = screenFrame($('#screen'), $('#screen-card'));
 let state = null;
 let full = false;
 let wallSig = '';
@@ -110,6 +110,7 @@ function layout() {
     r = { left: 8 - off, top: 0, width: innerWidth - 16, height: h0 };
   }
   placeFrame(ifr, r);
+  placeFrame($('#screen-card'), r);
 }
 addEventListener('resize', layout);
 

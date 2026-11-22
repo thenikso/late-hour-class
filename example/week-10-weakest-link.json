@@ -82,7 +82,8 @@
       "kind": "text",
       "pairs": true,
       "title": "Optional · in pairs, fix the promise",
-      "prompt": "Rewrite “This will make sure that no seat is ever wasted.” as a check and its limit. One or two sentences.",
+      "prompt": "Rewrite line 3 as a check and its limit. One or two sentences.",
+      "context": "The passage from “Spot the promise”:\n1. Requirement: a student can cancel a booking up to one hour before the event.\n2. Design: cancelling frees the seat and tells the first person on the waiting list.\n3. This will make sure that no seat is ever wasted.  ← the promise\n4. Check: a test cancels a booking for a full event; the waiting list moves up.\n5. Not shown yet: a cancellation that arrives exactly one hour before.",
       "parts": ["the check", "the limit"],
       "rubric": [
         "Names something a reader could check (a test, a log, a count)",

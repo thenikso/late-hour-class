@@ -110,17 +110,43 @@ export function placeFrame(iframe, r) {
   });
 }
 
+/**
+ * The wall screen without a page to show (a lesson with no deck): a card with the
+ * open question, or the lesson's title. Same 1280x720 frame as the iframe.
+ */
+function screenCard(card, state) {
+  const q = state.question;
+  const asking = q && !['present', 'seating'].includes(state.mode);
+  const lines = [];
+  if (asking) {
+    lines.push(['h1', q.title], ['p', q.prompt]);
+    if (q.context) lines.push(['p', q.context, 'context']);
+    if (q.kind === 'rapid' && q.status === 'open' && q.phase !== 'ready') lines.push(['p', q.rows[q.row].text, 'line']);
+    if (q.status === 'revealed') lines.push(['p', 'Results are out.', 'quiet']);
+  } else {
+    lines.push(['h1', state.lessonTitle || '']);
+  }
+  const sig = JSON.stringify(lines);
+  if (card.dataset.sig === sig) return;
+  card.dataset.sig = sig;
+  const long = lines.reduce((n, [, text]) => n + String(text || '').length, 0) > 420;
+  card.classList.toggle('long', long);
+  card.replaceChildren(...lines.filter(([, text]) => text).map(([tag, text, cls]) => h(tag, { class: cls || '' }, text)));
+}
+
 /** Keeps an iframe on the shared page; passes "reveal the next step" on to game-ready decks. */
-export function screenFrame(iframe) {
+export function screenFrame(iframe, card = null) {
   let current = null;
   let cueSeen = 0;
   return {
     update(state, deckUrl) {
       const s = state.screen || {};
       const url = s.slide && deckUrl ? `${deckUrl}#${s.slide}` : s.url;
+      if (card) card.hidden = !!url;
       if (!url) {
         iframe.hidden = true;
         current = null;
+        if (card) screenCard(card, state);
         return;
       }
       iframe.hidden = false;
