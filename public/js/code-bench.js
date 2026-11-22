@@ -87,7 +87,7 @@ export function bugEditor(q, d) {
         },
         mark: (n) => (n === d.line ? 'picked' : ''),
       }),
-      h('p', { class: 'quiet' }, d.line ? `You picked line ${d.line}.` : 'Click the line with the bug.'),
+      h('p', { class: 'quiet' }, d.line ? `You picked line ${d.line}.` : 'Click a line to pick it.'),
     );
   };
   draw();

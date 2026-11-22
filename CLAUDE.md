@@ -14,6 +14,7 @@ Nicola Peduzzi teaches Software Engineering at H-Farm and is the only user and d
 npm run example:mock   # Week 8 example with fake offline scoring (no AI)
 npm run example        # same, scoring with the local `claude` CLI
 npm run demo           # every question kind, the three rooms and trophies, from example/demo-lesson.json (mock AI)
+npm run week10         # "The weakest link": 30-minute after-midterm lesson, example/week-10-weakest-link.json (no deck)
 npm test               # node:test, isolated unit + HTTP integration tests (35 tests across 6 files)
 npm run report         # Markdown report of the newest session in data/ (add a file, or --names)
 npm start -- --lesson <deck url> --deck <student deck url> --projector <deck url> --notes "<deck url>?view=notes"
@@ -24,7 +25,7 @@ node tools/serve-slides.js <lectures folder>   # student copy on :3001 (LAN), fu
 
 The Monocraft font is committed in `public/fonts/`; there is no download step.
 
-`.claude/launch.json` has two previews, `example-mock` and `demo` (teacher key `demo`); both use `--data data/preview`, so browser checks never touch the real `data/term.json`.
+`.claude/launch.json` has three previews, `example-mock`, `demo` and `week10` (the last two with teacher key `demo`); both use `--data data/preview`, so browser checks never touch the real `data/term.json`.
 
 ## Hard rules
 

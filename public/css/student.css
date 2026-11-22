@@ -13,7 +13,7 @@
 }
 .sheet h2 { margin: 0 0 4px; font-size: 17px; color: var(--gold); }
 .sheet .prompt { margin: 0 0 6px; }
-.sheet .context { font-size: 13px; color: var(--quiet); margin: 0 0 8px; }
+.sheet .context { font-size: 13px; color: var(--quiet); margin: 0 0 8px; white-space: pre-line; }
 .sheet .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 8px; }
 .sheet .status { margin-left: auto; }
 .sheet .options { margin: 6px 0; padding-left: 0; list-style: none; }

@@ -128,7 +128,9 @@ export function createQuestionPanel({ act, alertBar, seatSeconds }) {
     box.hidden = !show;
     box.innerHTML = '';
     if (show) {
-      box.append(h('strong', {}, `Questions on slide ${s.screen.slide}`), questionList(onThisSlide));
+      // A lesson without a deck has no slide number: just say "Questions".
+      const label = s.screen.slide ? `Questions on slide ${s.screen.slide}` : 'Questions';
+      box.append(h('strong', {}, label), questionList(onThisSlide));
     }
   }
 

@@ -1,0 +1,132 @@
+{
+  "title": "The weakest link · after the midterm",
+  "questions": {
+    "mood": {
+      "kind": "line",
+      "title": "Warm-up · how was this morning?",
+      "prompt": "Compared with the Week 9 practice, the midterm felt… Stand where you are. (About the morning, not your answers.)",
+      "labels": ["Easier", "Harder"],
+      "room": "floor"
+    },
+    "deadline": {
+      "kind": "choice",
+      "title": "Quick one · the deadline",
+      "prompt": "When is your portfolio due? Walk to it.",
+      "options": ["Friday 11 December", "Tuesday 12 January, 16:00", "Monday 30 November", "Whenever it's ready"],
+      "correct": 1,
+      "minutes": 1,
+      "room": "floor"
+    },
+    "weight": {
+      "kind": "choice",
+      "title": "Quick one · how much it counts",
+      "prompt": "How much of the module is the portfolio? (About 3200 words.)",
+      "options": ["20%", "50%", "80%"],
+      "correct": 2,
+      "minutes": 1,
+      "room": "floor"
+    },
+    "evidence": {
+      "kind": "grid",
+      "title": "Evidenced, assumed or missing?",
+      "prompt": "Six lines from a Campus Event portfolio. Tick one for each.",
+      "context": "Evidenced: a reader can see it (a quote, a test result, a review note, a log). Assumed: you say it, but nothing shows it yet. Missing: the link isn't there.",
+      "options": ["Evidenced", "Assumed", "Missing"],
+      "rows": [
+        { "text": "Test log: 14 passed, 1 failed. The failure is linked to the booking requirement.", "correct": 0 },
+        { "text": "I wrote a test plan for cancelling a booking.", "correct": 1 },
+        { "text": "The diagram shows that payments stay inside one component.", "correct": 1 },
+        { "text": "Nothing checks yet what happens when an event is full.", "correct": 2 },
+        { "text": "A classmate's review note quotes the requirement and asks about the waiting list.", "correct": 0 },
+        { "text": "The code is good quality because I followed the style guide.", "correct": 1 }
+      ],
+      "minutes": 4
+    },
+    "passage": {
+      "kind": "choice",
+      "title": "Which passage helps a reader decide?",
+      "prompt": "Read both, then walk to the one you would keep.",
+      "context": "A: “Accessibility is important. The system will use good design, coding standards, and thorough testing. This will ensure that all users can book events.”\n\nB: “The booking requirement includes keyboard-only use. Keep the booking controls in a predictable focus order and verify the complete journey, including error recovery, without a mouse. Until that check has been performed, keyboard access remains an unverified claim.”",
+      "options": ["Passage A", "Passage B"],
+      "correct": 1,
+      "reasons": {
+        "options": ["It names a check and what isn't shown yet", "It is longer", "It sounds more confident"],
+        "correct": 0
+      },
+      "minutes": 3,
+      "room": "floor"
+    },
+    "promise": {
+      "kind": "bug",
+      "title": "Spot the promise",
+      "prompt": "One line promises something nobody can check. Click the line you would cut.",
+      "code": "Requirement: a student can cancel a booking up to one hour before the event.\nDesign: cancelling frees the seat and tells the first person on the waiting list.\nThis will make sure that no seat is ever wasted.\nCheck: a test cancels a booking for a full event; the waiting list moves up.\nNot shown yet: a cancellation that arrives exactly one hour before.",
+      "correct": 3,
+      "minutes": 3
+    },
+    "ask": {
+      "kind": "choice",
+      "title": "Peer review on 11 December",
+      "prompt": "You bring one passage. Which question gets you useful feedback? Walk to it.",
+      "options": ["Is my portfolio good?", "Does this check address the failure I identified?", "Is it long enough?"],
+      "correct": 1,
+      "reasons": {
+        "options": ["A classmate can answer it from one passage", "It is the most polite", "It covers the whole portfolio"],
+        "correct": 0
+      },
+      "minutes": 3,
+      "room": "floor"
+    },
+    "rewrite": {
+      "kind": "text",
+      "pairs": true,
+      "title": "Optional · in pairs, fix the promise",
+      "prompt": "Rewrite “This will make sure that no seat is ever wasted.” as a check and its limit. One or two sentences.",
+      "parts": ["the check", "the limit"],
+      "rubric": [
+        "Names something a reader could check (a test, a log, a count)",
+        "States what is still not shown, or where the check stops"
+      ],
+      "example": "==①A test fills an event, cancels one booking and expects the waiting list to move up.== ==②It does not yet cover a cancellation at the one-hour limit.==",
+      "minutes": 4,
+      "room": "lab"
+    },
+    "debug": {
+      "kind": "choice",
+      "title": "Next Monday",
+      "prompt": "If the fault disappears, did we debug it?",
+      "options": ["Yes, it works now", "Not yet", "It depends"],
+      "correct": null,
+      "scored": false,
+      "room": "base"
+    }
+  },
+  "trophies": [
+    {
+      "after": "weight",
+      "name": "12 January, 16:00",
+      "sprite": "flag",
+      "text": "Portfolio: 80% of the module, about 3200 words, due Tuesday 12 January 2027 at 16:00."
+    },
+    {
+      "after": "evidence",
+      "name": "Evidence lens",
+      "sprite": "key",
+      "text": "Evidenced means a reader can see it. A planned test is not a passed test; a diagram is not proof.",
+      "example": "Mark each link E, A or M, then pick the next action that produces evidence."
+    },
+    {
+      "after": "promise",
+      "name": "Cut the promise",
+      "sprite": "tape",
+      "text": "Keep the reason, the check and the limit. Cut what only promises.",
+      "example": "“This will ensure all users can book” → which check, and what isn't shown yet?"
+    },
+    {
+      "after": "ask",
+      "name": "One bounded question",
+      "sprite": "bulb",
+      "text": "On 11 December bring one passage, the decision it supports, and one question a classmate can answer."
+    }
+  ]
+}

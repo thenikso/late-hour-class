@@ -4,12 +4,15 @@
   "private": true,
   "description": "A pixel-art classroom game: students join over the LAN, the teacher drives slides, questions and scoring. Node only, no dependencies.",
   "type": "module",
-  "engines": { "node": ">=20" },
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "start": "node server.js",
     "example": "node tools/run-example.js",
     "example:mock": "node tools/run-example.js --ai mock",
     "demo": "node server.js --lesson example/demo-lesson.json --ai mock --data data/preview",
+    "week10": "node server.js --lesson example/week-10-weakest-link.json --ai mock --data data/preview",
     "slides": "node tools/serve-slides.js",
     "report": "node tools/report.js",
     "test": "node --test test/*.test.js"
