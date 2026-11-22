@@ -32,7 +32,7 @@
       "prompt": "Six lines from a Campus Event portfolio, one at a time. Stand in your answer before the time runs out.",
       "context": "Evidenced: a reader can see it (a quote, a test result, a review note, a log). Assumed: you say it, but nothing shows it yet. Missing: the link isn't there.",
       "options": ["Evidenced", "Assumed", "Missing"],
-      "seconds": 12,
+      "seconds": 30,
       "rows": [
         { "text": "Test log: 14 passed, 1 failed. The failure is linked to the booking requirement.", "correct": 0 },
         { "text": "I wrote a test plan for cancelling a booking.", "correct": 1 },

@@ -7,7 +7,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Game } from '../lib/game.js';
 import { normaliseLesson } from '../lib/manifest.js';
-import { rapidOrder, stepRapid } from '../lib/rapid.js';
+import { rapidOrder, stepRapid, secondsFor } from '../lib/rapid.js';
 import { POINTS } from '../lib/scoring.js';
 import { zones } from '../public/js/shared/world.js';
 
@@ -116,9 +116,32 @@ test('the teacher can stop a rapid round early without the gate', () =>
 
 test('the manifest keeps rapid seconds in range and scrambles by default', () => {
   const lesson = normaliseLesson({ questions: { a: { ...ROUND, seconds: 999 }, b: { ...ROUND, seconds: 1, scramble: false } } });
-  assert.equal(lesson.questions.a.seconds, 60);
+  assert.equal(lesson.questions.a.seconds, 120);
   assert.equal(lesson.questions.a.scramble, true);
   assert.equal(lesson.questions.b.seconds, 3);
   assert.equal(lesson.questions.b.scramble, false);
   assert.deepEqual(lesson.questions.a.rows[1].correct, [1]);
 });
+
+test('the teacher sets the seconds per line, also for the line being answered', () =>
+  withGame(ROUND, ({ game }) => {
+    game.open('r');
+    const rec = game.live;
+    game.setRapidSeconds(30); // during the intro: counts from line 1
+    stepRapid(game);
+    assert.equal(secondsFor(rec), 30);
+    assert.equal(game.screenView().question.seconds, 30);
+    assert.ok(Math.abs(rec.phaseEndsAt - rec.phaseStartedAt - 30000) < 50);
+
+    game.setRapidSeconds(45); // mid-line: this line now runs 45 s from when it came up
+    assert.ok(Math.abs(rec.phaseEndsAt - rec.phaseStartedAt - 45000) < 50);
+
+    rec.phaseStartedAt -= 40000; // 40 s into the line, then cut it to 10 s: a little time is left
+    game.setRapidSeconds(10);
+    assert.ok(rec.phaseEndsAt >= Date.now() + 1900, 'never ends the line under their feet');
+
+    game.setRapidSeconds(999);
+    assert.equal(secondsFor(rec), 120);
+    game.setRapidSeconds(1);
+    assert.equal(secondsFor(rec), 5);
+  }));

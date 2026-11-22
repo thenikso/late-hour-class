@@ -15,7 +15,7 @@ npm run example:mock   # Week 8 example with fake offline scoring (no AI)
 npm run example        # same, scoring with the local `claude` CLI
 npm run demo           # every question kind, the three rooms and trophies, from example/demo-lesson.json (mock AI)
 npm run week10         # "The weakest link": 30-minute after-midterm lesson, example/week-10-weakest-link.json (no deck)
-npm test               # node:test, isolated unit + HTTP integration tests (44 tests across 8 files)
+npm test               # node:test, isolated unit + HTTP integration tests (45 tests across 8 files)
 npm run report         # Markdown report of the newest session in data/ (add a file, or --names)
 npm start -- --lesson <deck url> --deck <student deck url> --projector <deck url> --notes "<deck url>?view=notes"
 node tools/serve-slides.js <lectures folder>   # student copy on :3001 (LAN), full copy on :3002 (localhost)
@@ -91,7 +91,7 @@ A deck becomes game-ready with a `<script type="application/json" id="game-lesso
 - `text`: `prompt`, `parts` (named parts students mark as `==①…==`), `rubric`, `example`.
 - `choice`: `options`, `correct` (index, list, or `null` for a poll), `partial`, `zones` (default true: answer by standing in a floor zone), `shuffle`, `reasons` (`{options, correct}`), optional `text` follow-up (`{prompt, parts, rubric}`).
 - `grid`: `options`, `rows` (`{text, options?, correct}`; `correct` can be a list).
-- `rapid`: `options` (2–4, the floor zones), `rows` (`{text, correct}`), `seconds` per line (default 10), `scramble` (default true: every student gets their own zone order, new on every line). Runs by itself: intro, then each line, then its answer for 3 seconds; closes itself after the last line. The one exception to "nothing closes by itself". Stored and scored like a grid.
+- `rapid`: `options` (2–4, the floor zones), `rows` (`{text, correct}`), `seconds` per line (default 10; the teacher can change it live with `rapid-seconds`, 5–120), `scramble` (default true: every student gets their own zone order, new on every line). Runs by itself: intro, then each line, then its answer for 3 seconds; closes itself after the last line. The one exception to "nothing closes by itself". Stored and scored like a grid.
 - `bug`: `code`, `correct` (line number or list, from 1). `code`: `starter`, `tests` (`[{ name, check }]`, each check a JavaScript expression that must be true).
 - `line`: `labels` (the two ends). Always unscored; the answer is where the student stands (0–100).
 - Any kind: `title`, `context`, `stretch` (optional extra challenge for early finishers), `scored: false` for unscored polls, `room` (`floor` or `lab`: the door opens first), `pairs: true` (one answer per pair; a `text` pair question is one shared draft per desk, see `lib/desks.js`).

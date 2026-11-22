@@ -76,6 +76,7 @@ const TEACHER_ACTIONS = {
   open: (game, b) => game.open(b.key || b.def, { force: b.force }),
   close: (game, b) => game.close({ force: b.force }),
   timer: (game, b) => game.setTimer(b.seconds),
+  'rapid-seconds': (game, b) => game.setRapidSeconds(b.seconds), // seconds per line of a rapid round
   score: (game, b) => {
     if (game.scoring) throw new Error('Already scoring');
     game.checkGate(b.force);
