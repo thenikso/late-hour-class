@@ -1,6 +1,6 @@
 # Classroom pixel game: design
 
-Started 9 November 2026 by Nicola Peduzzi. This is the Markdown copy of the [spec doc](https://claude.ai/artifact/JJczReH1B9ScxB52tDxXJB) (revision 31), which also has the five diagrams this copy describes in words. **The spec was written before the proof of concept**; where the two differ, the [As built](#as-built-proof-of-concept-9-november-2026) section at the end says what the code actually does.
+Started 9 November 2026 by Nicola Peduzzi. This is the Markdown copy of the original spec doc (revision 31, not public), which also has the five diagrams this copy describes in words. **The spec was written before the proof of concept**; where the two differ, the [As built](#as-built-proof-of-concept-9-november-2026) section at the end says what the code actually does.
 
 ## Why and how we judge it
 
@@ -135,7 +135,7 @@ The engine stays generic by reading a small, course-neutral **lesson manifest**.
 </script>
 ```
 
-(This was the initial proposal; the implemented schema is in `CLAUDE.md` and `lib/manifest.js`, including trophies and `data-game-room`.)
+(This was the initial proposal; the implemented schema is in `AGENTS.md` and `lib/manifest.js`, including trophies and `data-game-room`.)
 
 How it works and where to draw the lines:
 
@@ -271,7 +271,7 @@ Built:
 - Student deck copy with notes and work-slide answers stripped, served on the LAN; the full deck stays on localhost.
 - Session JSON in `data/`, `--resume` after a restart; 9 automated tests.
 
-Added on 11 November 2026, the "fun layer" (see `CLAUDE.md` for the rules):
+Added on 11 November 2026, the "fun layer" (see `AGENTS.md` for the rules):
 
 - Reactions (six emote bubbles, a hop) with a quiet "I'm lost" signal to the teacher.
 - Hats unlocked by points or by improving on a retry (the first cosmetic rewards from this spec).

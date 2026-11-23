@@ -1,6 +1,6 @@
 # Class game engine
 
-The design and its reasons are in [docs/design.md](docs/design.md); a 1-page tour of the codebase for students is in [ARCHITECTURE.md](ARCHITECTURE.md); notes for working on the code (with Claude or otherwise) are in [CLAUDE.md](CLAUDE.md).
+The design and its reasons are in [docs/design.md](docs/design.md); a 1-page tour of the codebase for students is in [ARCHITECTURE.md](ARCHITECTURE.md); notes for working on the code (by hand or with an AI agent) are in [AGENTS.md](AGENTS.md); how to send a change is in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 A pixel-art classroom that runs from the teacher's laptop. Students join from their own browser over the classroom Wi-Fi, pick an avatar and walk around a shared room. The teacher drives the slides on the room's screen, seats everyone for explanations, opens questions, and reveals scores with a bit of show.
 
@@ -152,3 +152,11 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for a walkthrough of how a student action
 ## Not built
 
 Optional side rooms for early finishers, an AI check on the questions board, and sign-in with school accounts.
+
+## Contributing
+
+Ideas, bug reports and pull requests are welcome, from students and anyone else. Read [CONTRIBUTING.md](CONTRIBUTING.md) first: it explains which changes get in, and that using AI is fine as long as you say so. Please follow the [code of conduct](CODE_OF_CONDUCT.md), and report security problems privately as described in [SECURITY.md](SECURITY.md).
+
+## License
+
+MIT, see [LICENSE](LICENSE). The art in `public/assets/` is CC0 (see `public/assets/LICENSE.md`), the Monocraft font is SIL OFL (`public/fonts/OFL.txt`), and CodeMirror is MIT (`public/vendor/CODEMIRROR-LICENSE`).
