@@ -22,6 +22,9 @@ fetch('/api/info')
     $('#join-url').textContent = info.studentUrl;
     const qr = qrCanvas(info.studentUrl, 3);
     if (qr) $('#join-qr').replaceChildren(qr);
+    $('#join-big-url').textContent = info.studentUrl;
+    const big = qrCanvas(info.studentUrl, 10);
+    if (big) $('#join-big-qr').replaceChildren(big);
   });
 
 $('#sound').onclick = () => {
@@ -125,7 +128,8 @@ function render() {
   frame.update(s, s.deckUrl);
   layout();
   const asking = s.question && s.question.status !== 'revealed' && !['present', 'seating'].includes(s.mode);
-  $('#join').hidden = s.mode === 'present' || full || asking;
+  $('#join').hidden = s.mode === 'present' || full || asking || s.showJoin;
+  $('#join-big').hidden = !s.showJoin;
 
   const banner = $('#banner');
   banner.hidden = !(s.door || s.mode === 'seating');

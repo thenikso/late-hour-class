@@ -68,6 +68,7 @@ const TEACHER_ACTIONS = {
   room: (game, b) => game.openDoor(b.room, Number(b.seconds) || undefined, { force: b.force }),
   seat: (game, b) => game.takeSeats(Number(b.seconds) || 20, { force: b.force }),
   finale: (game, b) => game.setFinale(b.on !== false),
+  'show-join': (game, b) => game.setShowJoin(b.on !== false), // the join link, big on the projector
   // the shared screen
   slide: (game, b) => game.goSlide(b.slide),
   cue: (game) => game.cue(),

@@ -108,6 +108,7 @@ $('#goto').addEventListener('keydown', (e) => {
 });
 $('#finale').onclick = () => act('finale', { on: !state?.finale });
 $('#show-asks').onclick = () => act('show-asks', { on: !state?.showAsks });
+$('#show-join').onclick = () => act('show-join', { on: !state?.showJoin });
 
 // Arrow keys and E drive the slides, like in the deck itself.
 addEventListener('keydown', (e) => {
@@ -151,6 +152,7 @@ function render() {
   document.querySelectorAll('[data-mode]').forEach((b) => b.classList.toggle('on', b.dataset.mode === s.mode));
   $('#seat').classList.toggle('on', s.mode === 'seating');
   $('#finale').classList.toggle('on', !!s.finale);
+  $('#show-join').classList.toggle('on', !!s.showJoin);
   if (s.notesUrl && s.screen.slide) notes.update({ screen: s.screen }, s.notesUrl);
   $('#notes-box').hidden = !s.notesUrl;
   // Students who pressed "I'm lost" on this slide (they clear it with "Got it").

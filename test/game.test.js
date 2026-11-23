@@ -402,6 +402,15 @@ test('questions board tags slides, holds non-questions, counts votes for points,
 
     await teacher('show-asks', { on: true });
     assert.equal(game.screenView().asks[0].slide, 12);
+
+    // The join link goes big on the projector and comes off again; students never see the flag.
+    assert.equal(game.screenView().showJoin, false);
+    await teacher('show-join', { on: true });
+    assert.equal(game.screenView().showJoin, true);
+    assert.equal(game.teacherView().showJoin, true);
+    assert.equal(view(ada).showJoin, undefined);
+    await teacher('show-join', { on: false });
+    assert.equal(game.screenView().showJoin, false);
     await teacher('ask-status', { id, status: 'answered' });
     assert.deepEqual(game.screenView().asks, []);
   }));
