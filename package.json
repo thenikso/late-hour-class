@@ -1,8 +1,27 @@
 {
-  "name": "class-game-engine",
+  "name": "late-hour-class",
   "version": "0.1.0",
   "private": true,
   "description": "A pixel-art classroom game: students join over the LAN, the teacher drives slides, questions and scoring. Node only, no dependencies.",
+  "keywords": [
+    "classroom",
+    "teaching",
+    "education",
+    "game",
+    "pixel-art",
+    "multiplayer",
+    "slides"
+  ],
+  "homepage": "https://github.com/thenikso/late-hour-class",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/thenikso/late-hour-class.git"
+  },
+  "bugs": {
+    "url": "https://github.com/thenikso/late-hour-class/issues"
+  },
+  "license": "MIT",
+  "author": "Nicola Peduzzi",
   "type": "module",
   "engines": {
     "node": ">=20"

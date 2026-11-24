@@ -1,4 +1,4 @@
-# Architecture: how the class game works
+# Architecture: how Late Hour Class works
 
 Welcome! This project has **no build step and no server dependencies** (only Node 20+ built-ins and plain ES modules in the browser). You can read any file directly and trace what runs.
 

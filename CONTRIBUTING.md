@@ -1,6 +1,6 @@
 # Contributing
 
-Thanks for wanting to make the class game better! Students, teachers and anyone else are welcome to report bugs, suggest ideas and send pull requests.
+Thanks for wanting to make Late Hour Class better! Students, teachers and anyone else are welcome to report bugs, suggest ideas and send pull requests.
 
 This is a small project with one maintainer, so a few rules keep it fun to work on. Please read them before you start.
 
@@ -46,7 +46,7 @@ You need Node 20 or later. There is nothing to install.
 
 ```sh
 git clone <your fork>
-cd class-game-engine
+cd late-hour-class
 npm test            # 45+ tests, about a second
 npm run demo        # every question kind with fake scoring
 ```

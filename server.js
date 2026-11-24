@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Class game engine: one Node process, no dependencies.
+// Late Hour Class: one Node process, no dependencies.
 //
 //   node server.js --lesson <deck url or .json> [--deck <student deck url>] [--projector <deck url>]
 //                  [--notes <teacher deck url>] [--port 3000] [--ai claude|codex|mock|off]

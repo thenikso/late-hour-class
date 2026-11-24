@@ -2,7 +2,7 @@
 
 Instructions for AI coding agents (and humans) working on this repo. `CLAUDE.md` is a symlink to this file.
 
-A pixel-art classroom game that runs from the teacher's laptop. Students join from their browsers over the classroom Wi-Fi, walk around a shared room as avatars, and answer questions; the teacher drives the slides on the room's screen, seats everyone for explanations, opens questions and reveals scores. The goal is to keep students working through 3-hour lessons, especially the last hour.
+Late Hour Class (LHC) is a pixel-art classroom game that runs from the teacher's laptop. Students join from their browsers over the classroom Wi-Fi, walk around a shared room as avatars, and answer questions; the teacher drives the slides on the room's screen, seats everyone for explanations, opens questions and reveals scores. The goal is to keep students working through 3-hour lessons, especially the last hour.
 
 The design and the reasons behind it are in [docs/design.md](docs/design.md). The README covers running it and making a deck game-ready.
 

@@ -1,4 +1,6 @@
-# Class game engine
+# Late Hour Class
+
+**LHC** for short: a classroom game for the last hour of a long lesson, when attention is lowest.
 
 The design and its reasons are in [docs/design.md](docs/design.md); a 1-page tour of the codebase for students is in [ARCHITECTURE.md](ARCHITECTURE.md); notes for working on the code (by hand or with an AI agent) are in [AGENTS.md](AGENTS.md); how to send a change is in [CONTRIBUTING.md](CONTRIBUTING.md).
 
