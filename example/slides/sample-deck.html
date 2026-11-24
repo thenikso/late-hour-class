@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Good guesses: a sample game-ready deck</title>
+<link rel="stylesheet" href="deck.css">
+<!--
+  A short sample lesson that shows how a deck becomes game-ready:
+  1. the JSON block below (id="game-lesson") lists the questions and trophies;
+  2. data-game-question on a slide ties its questions to it;
+  3. game-bridge.js lets the game press E and jump between slides.
+  Speaker notes live in <div class="sn">; the student copy served by tools/serve-slides.js
+  removes them, and removes the answers (data-cue) on data-mode="work" slides.
+-->
+<script type="application/json" id="game-lesson">
+{
+  "title": "Good guesses",
+  "questions": {
+    "warm": {
+      "kind": "line", "title": "Warm-up",
+      "prompt": "How do you feel about guessing a number you don't know?",
+      "labels": ["I'd rather not", "Love it"]
+    },
+    "a": {
+      "kind": "choice", "title": "A billion grains",
+      "prompt": "Someone says: \"There are about a billion grains of sand on this beach.\" What is the best first move?",
+      "options": ["Agree: it sounds about right", "Disagree: it sounds too big", "Break it into parts you can guess"],
+      "correct": [2],
+      "text": {
+        "prompt": "Because …",
+        "rubric": ["Says a big number is easier to judge when split into smaller numbers you can guess (size of the beach, grains in a handful…)", "Agreeing or disagreeing on a feeling is a guess about the answer, not a way to find it"]
+      }
+    },
+    "d": {
+      "kind": "grid", "title": "Sensible or way off?",
+      "prompt": "For each guess: is it sensible for an estimate, or way off?",
+      "options": ["Sensible", "Way off"],
+      "rows": [
+        { "text": "A person sleeps about 8 hours a day.", "correct": 0 },
+        { "text": "A car is about 40 metres long.", "correct": 1 },
+        { "text": "A bathtub holds about 2 litres.", "correct": 1 },
+        { "text": "A loaf of bread has about 20 slices.", "correct": [0, 1] }
+      ]
+    },
+    "f": {
+      "kind": "text", "title": "Water in a year",
+      "prompt": "Estimate how many litres of water you drink in a year. Mark each part.",
+      "parts": ["per day", "days", "result"],
+      "rubric": ["A daily amount between about 1 and 3 litres", "Multiplies by about 365 days (or rounds to 400)", "A result of a few hundred litres to about a thousand, with the calculation shown"],
+      "example": "==①about 2 litres a day== × ==②about 365 days== = ==③roughly 700 litres a year=="
+    },
+    "g": {
+      "kind": "choice", "title": "The weakest part",
+      "prompt": "Which part of this estimate would you check first? Walk to it.",
+      "context": "Pizzas eaten at school in a week = students × share who buy lunch × days × slices each ÷ 8. Your guesses: 800 students, half of them buy lunch, 5 days, 2 slices each.",
+      "options": ["① 800 students", "② 5 school days", "③ half of them buy lunch", "④ 8 slices per pizza"],
+      "correct": [2],
+      "partial": [0],
+      "text": {
+        "prompt": "If the real share is much higher, the total … If it is much lower, the total …",
+        "parts": ["if higher", "if lower"],
+        "rubric": ["Says the share is the least certain guess, and the total moves with it (twice the share, twice the pizzas)", "Days and slices per pizza are close to certain; the number of students is easy to look up"]
+      }
+    },
+    "m": {
+      "kind": "text", "title": "Check the size",
+      "prompt": "Your estimate says the school eats 10,000 pizzas a week. Write one quick check that tells you whether that is believable.",
+      "parts": ["the check", "what it shows"],
+      "rubric": ["A quick comparison with something known (pizzas per student per day, what one kitchen can bake)", "Says what the check shows: 10,000 a week is about 12 pizzas per student, so it is far too many"]
+    }
+  },
+  "trophies": [
+    { "after": "a", "name": "Break it down", "sprite": "tape",
+      "text": "A number you can't guess is often a few numbers you can, multiplied together.",
+      "example": "Grains of sand = beach size × grains per handful.", "slide": 3 },
+    { "after": "m", "name": "Check the size", "sprite": "flag",
+      "text": "Before you trust an estimate, compare it with something you already know.", "slide": 8 }
+  ]
+}
+</script>
+</head>
+<body>
+
+<section class="slide" id="1" data-mode="teach" data-seg="Opening">
+  <div class="face">
+    <p class="eyebrow">Sample lesson</p>
+    <h1>Good guesses</h1>
+    <p>How to estimate a number nobody told you.</p>
+  </div>
+  <div class="sn"><h3>Opening</h3><p>Welcome everyone. Today: estimating numbers we can't look up.</p></div>
+</section>
+
+<section class="slide" id="2" data-game-question="warm" data-mode="teach" data-seg="Warm-up">
+  <div class="face">
+    <p class="eyebrow">Warm-up</p>
+    <h2>How do you feel about guessing a number you don't know?</h2>
+    <p>Stand on the line, anywhere between the two ends.</p>
+  </div>
+  <div class="sn"><h3>Warm-up</h3><p>Open the line question. Ask one person from each end why they stand there.</p></div>
+</section>
+
+<section class="slide" id="3" data-game-question="a" data-mode="work" data-seg="A billion grains">
+  <div class="face">
+    <p class="eyebrow">Your turn · A</p>
+    <h2>“There are about a billion grains of sand on this beach.” Best first move?</h2>
+    <ul class="options"><li>Agree</li><li>Disagree</li><li>Break it into parts</li></ul>
+    <div class="reveal" data-cue><strong>Break it into parts.</strong> How big is the beach? How many grains in a handful? Those you can guess.</div>
+  </div>
+  <div class="sn"><h3>A billion grains</h3><p>Expected: break it into parts. Accept "disagree" only if they then estimate.</p></div>
+</section>
+
+<section class="slide" id="4" data-mode="teach" data-seg="Round boldly">
+  <div class="face">
+    <p class="eyebrow">Explanation</p>
+    <h2>Round boldly, multiply, then check the size</h2>
+    <p>Use round numbers: 1, 2, 5, 10, 100. Being within a factor of ten is a good start.</p>
+    <p data-cue>An estimate is only as good as its weakest part.</p>
+  </div>
+  <div class="sn"><h3>Round boldly</h3><p>Press E for the second line after asking which part they would trust least.</p></div>
+</section>
+
+<section class="slide" id="5" data-game-question="d" data-mode="work" data-seg="Sensible or way off">
+  <div class="face">
+    <p class="eyebrow">Your turn · D</p>
+    <h2>Sensible or way off?</h2>
+    <p>Sleep 8 hours · a 40 m car · a 2 litre bathtub · 20 slices in a loaf</p>
+    <div class="reveal" data-cue>Sensible, way off, way off, and the bread depends on the loaf.</div>
+  </div>
+  <div class="sn"><h3>Sensible or way off</h3><p>The bread row accepts both answers: talk about it.</p></div>
+</section>
+
+<section class="slide" id="6" data-game-question="f" data-mode="work" data-seg="Water in a year">
+  <div class="face">
+    <p class="eyebrow">Your turn · F</p>
+    <h2>How many litres of water do you drink in a year?</h2>
+    <p>Mark each part: per day, days, result.</p>
+    <div class="reveal" data-cue>About 2 litres × about 365 days ≈ 700 litres.</div>
+  </div>
+  <div class="sn"><h3>Water in a year</h3><p>Anything from a few hundred to a thousand litres is fine if the parts are shown.</p></div>
+</section>
+
+<section class="slide" id="7" data-game-question="g" data-mode="work" data-seg="The weakest part">
+  <div class="face">
+    <p class="eyebrow">Your turn · G</p>
+    <h2>Pizzas at school in a week: which part would you check first?</h2>
+    <p><code>800 students × ½ buy lunch × 5 days × 2 slices ÷ 8</code></p>
+    <div class="reveal" data-cue><strong>The share who buy lunch.</strong> It's the least certain guess, and the total moves with it.</div>
+  </div>
+  <div class="sn"><h3>The weakest part</h3><p>The number of students is easy to look up; the share is a pure guess.</p></div>
+</section>
+
+<section class="slide" id="8" data-game-question="m" data-mode="work" data-seg="Check the size">
+  <div class="face">
+    <p class="eyebrow">Your turn · M</p>
+    <h2>10,000 pizzas a week. Believable?</h2>
+    <div class="reveal" data-cue>That's about 12 pizzas per student per week: far too many. Something went wrong.</div>
+  </div>
+  <div class="sn"><h3>Check the size</h3><p>Look for a comparison with something known, not a recalculation.</p></div>
+</section>
+
+<section class="slide" id="9" data-mode="gate" data-seg="Close">
+  <div class="face">
+    <h1>Thanks!</h1>
+    <p>Break it down, round boldly, check the size.</p>
+  </div>
+  <div class="sn"><h3>Close</h3><p>Show the finale if there is time.</p></div>
+</section>
+
+<script src="deck.js"></script>
+<script src="game-bridge.js"></script>
+</body>
+</html>

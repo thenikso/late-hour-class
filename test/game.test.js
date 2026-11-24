@@ -19,7 +19,7 @@ import { ROOMS, HOT_SEAT, DOOR, canStand } from '../public/js/shared/rooms.js';
 import { parseMarks } from '../public/js/shared/marks.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
-const DECK = join(ROOT, 'example/lectures/week-08/week-08-slides.html');
+const DECK = join(ROOT, 'example/slides/sample-deck.html');
 const BALL_HOME = ROOMS.base.ballHome;
 const wait = (ms) => new Promise((ok) => setTimeout(ok, ms));
 
@@ -39,7 +39,7 @@ async function withClassroom(opts, fn) {
   const dataDir = await mkdtemp(join(tmpdir(), 'cge-'));
   const srv = await start({
     lesson: DECK,
-    deck: 'http://127.0.0.1:1/week-08-slides.html',
+    deck: 'http://127.0.0.1:1/sample-deck.html',
     port: 0,
     ai: 'mock',
     data: dataDir,
@@ -102,8 +102,8 @@ test('join enforces unique names, player cap, unknown tokens, and teacher-unlock
 
 test('slides, cue, and take-your-seat countdown move everyone to desks then lock movement', () =>
   withClassroom(async ({ game, students, post, teacher }) => {
-    await teacher('slide', { slide: 25 });
-    assert.equal(game.screen.slide, 25);
+    await teacher('slide', { slide: 5 });
+    assert.equal(game.screen.slide, 5);
     await teacher('cue');
     assert.equal(game.screen.cue, 1);
 
@@ -300,7 +300,7 @@ test('submit gate holds room until all online students hand in, full-house award
     await assert.rejects(teacher('open', { key: 'a' }), /still writing/);
     assert.equal(game.studentView(game.players.get(students[0].id)).question.waitingFor, undefined, 'waiting list stays private');
 
-    await teacher('slide', { slide: 26 }); // changing slide is not gated
+    await teacher('slide', { slide: 6 }); // changing slide is not gated
     for (const s of students.slice(2)) await post('/api/answer', { token: s.token, choice: 1 });
     await teacher('close');
     assert.equal(game.records.gate.fullHouse, true);
@@ -382,13 +382,13 @@ test('questions board tags slides, holds non-questions, counts votes for points,
 
     const [ada, bo, cy] = students;
     const view = (s) => game.studentView(game.players.get(s.id));
-    await teacher('slide', { slide: 12 });
+    await teacher('slide', { slide: 4 });
 
     assert.equal((await post('/api/ask', { token: ada.token, text: 'Why do we need two explanations?' })).status, 'posted');
     await assert.rejects(post('/api/ask', { token: ada.token, text: 'And why three?' }), /wait/);
     assert.equal((await post('/api/ask', { token: bo.token, text: 'pizza pizza pizza' })).status, 'held');
     assert.equal(view(cy).asks.length, 1);
-    assert.equal(view(cy).asks[0].slide, 12, 'tagged with current slide');
+    assert.equal(view(cy).asks[0].slide, 4, 'tagged with current slide');
     assert.equal(view(bo).asks.find((a) => a.mine).status, 'held');
 
     const id = view(cy).asks[0].id;
@@ -401,7 +401,7 @@ test('questions board tags slides, holds non-questions, counts votes for points,
     assert.equal(view(ada).asks[0].votes, 1);
 
     await teacher('show-asks', { on: true });
-    assert.equal(game.screenView().asks[0].slide, 12);
+    assert.equal(game.screenView().asks[0].slide, 4);
 
     // The join link goes big on the projector and comes off again; students never see the flag.
     assert.equal(game.screenView().showJoin, false);
@@ -427,8 +427,8 @@ test('trophies, term persistence, atomic session restore, privacy boundaries and
     await teacher('reveal');
 
     const [t] = game.screenView().trophies;
-    assert.equal(t.name, 'Gone is not fixed');
-    assert.equal(t.url, 'http://127.0.0.1:1/week-08-slides.html#3');
+    assert.equal(t.name, 'Break it down');
+    assert.equal(t.url, 'http://127.0.0.1:1/sample-deck.html#3');
     await teacher('trophy', { id: 'm' });
     assert.deepEqual(game.teacherView().lessonTrophies.map((x) => x.earned), [true, true]);
 

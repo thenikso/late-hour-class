@@ -8,14 +8,14 @@ The design and the reasons behind it are in [docs/design.md](docs/design.md). Th
 
 ## Who this is for
 
-Nicola Peduzzi built it for the Software Engineering course at H-Farm and maintains it; it has been used in real lessons since November 2026. It is open source so that students (and anyone else) can read it and send changes. A Claude skill makes each week's deck game-ready, so the engine itself must stay generic.
+Nicola Peduzzi built it for a weekly 3-hour course and maintains it; it has been used in real lessons since November 2026. It is open source so that students (and anyone else) can read it and send changes. A Claude skill makes each week's deck game-ready, so the engine itself must stay generic.
 
 **Before you change anything, read [CONTRIBUTING.md](CONTRIBUTING.md).** It says which changes get accepted, how to declare AI help in a pull request, and the checklist a pull request must pass. If you are an AI agent preparing a contribution, follow it: keep the change small and focused, add tests, and write the AI disclosure in the pull request description.
 
 ## Commands
 
 ```sh
-npm run example:mock   # Week 8 example with fake offline scoring (no AI)
+npm run example:mock   # the sample deck with fake offline scoring (no AI)
 npm run example        # same, scoring with the local `claude` CLI
 npm run demo           # every question kind, the three rooms and trophies, from example/demo-lesson.json (mock AI)
 npm run week10         # "The weakest link": 30-minute after-midterm lesson, example/week-10-weakest-link.json (no deck)
@@ -34,7 +34,7 @@ The Monocraft font is committed in `public/fonts/`; there is no download step.
 ## Hard rules
 
 - **No install, no build step.** Node 20+ built-ins only on the server; plain ES modules, HTML and CSS in the browser. Students may read every file one day, so keep the code plain and commented where it isn't obvious. The one outside library is CodeMirror 6, vendored as a single pre-bundled file (`public/vendor/codemirror.js`, rebuilt from `tools/vendor/`); it holds no game logic, and the game's own code stays unbundled. Don't add another dependency without the maintainer agreeing first (open an issue).
-- **The engine is course-neutral.** No Software Engineering or H-Farm logic in `server.js`, `lib/` or `public/`. Course content arrives only through a lesson manifest (in a deck or a JSON file) and a deck URL. The Week 8 deck in `example/` is just an example.
+- **The engine is course-neutral.** No course- or school-specific logic in `server.js`, `lib/` or `public/`. Course content arrives only through a lesson manifest (in a deck or a JSON file) and a deck URL. The sample deck in `example/slides/` is just an example.
 - **The server is the only source of truth.** Clients send intentions (move, answer); the server validates, decides and broadcasts. Zone answers use the player's position on the server, not what the client claims. The one exception is the code bench: student code runs only in that student's browser (a Web Worker), which reports which checks passed; the teacher sees the code beside the result. Never run student code on the server.
 - **Student text is never rendered as HTML.** Use `textContent`, the `h()` helper in `public/js/common.js`, or `marksToHtml()` (which escapes first). Keep it that way everywhere, including the projector.
 - **Scores are for fun.** They never feed a grade. Retries are never penalised: the best attempt counts, and a better retry earns the IMPROVED badge. Leaderboards show only the top 5 plus "Improved today".
@@ -66,7 +66,7 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for the student-facing tour.
 - `public/js/editors.js`: the two CodeMirror editors: `proseEditor` and `codeEditor`.
 - `public/js/student.js`, `student-sheet.js`, `student-panels.js`, `teacher.js`, `teacher-question.js`, `screen.js`: the three pages. `common.js` has the DOM helper, SSE connection, screen iframe and score count-up.
 - `tools/serve-slides.js`: serves a lectures folder twice. The student copy strips speaker notes (`.sn`) and the answer boxes (`data-cue`) on `data-mode="work"` slides; the teacher copy is the full deck, on localhost only.
-- `example/lectures/`: copies of the course's slide engine and the Week 8 deck, plus `scripts/game-bridge.js`.
+- `example/slides/`: a short sample deck (`sample-deck.html`, the tests use it too), its tiny slide engine (`deck.js`, `deck.css`) and `game-bridge.js`, the script any deck loads to work inside the game.
 
 A player's position is the top-left of the tile they fill; their feet (`FEET`, and the small `FOOT_BOX` that collides) are near its bottom. The browser walks with `walk()` (it slides along furniture); the server only checks `canStand()` for each reported position and ignores a move into something solid. Every room must keep the door, the hot seat, the front strip and every seat free: a test checks it.
 

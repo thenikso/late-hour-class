@@ -246,7 +246,7 @@ Decided by Nicola on 9 November 2026:
 - First trial: the last hour of Week 8 (Monday 16 November 2026), if the students are up for it.
 - No anonymity needed in class: real names can show.
 - Scoring is "for fun" and will evolve; retries are not penalised, and improvement is highlighted rather than a plain ranking.
-- The engine lives in its own folder and repo (`class-game-engine`), with a game-ready Week 8 deck in an example folder. A skill for preparing lessons comes later.
+- The engine lives in its own folder and repo (`class-game-engine`), with a game-ready Week 8 deck in an example folder (replaced by a short generic sample deck before the code was published). A skill for preparing lessons comes later.
 - The whole of Week 8 is in the example, and the teacher can jump straight to any slide (for example the last hour).
 - The room and avatars use The Agency's CC0 pixel art.
 

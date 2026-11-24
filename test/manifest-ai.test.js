@@ -10,13 +10,13 @@ import { studentCopy, serveSlides } from '../tools/serve-slides.js';
 import { ROOMS } from '../public/js/shared/rooms.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
-const DECK = join(ROOT, 'example/lectures/week-08/week-08-slides.html');
+const DECK = join(ROOT, 'example/slides/sample-deck.html');
 
-test('Week 8 deck and demo lesson load cleanly with stretch prompts and valid rooms', async () => {
-  const week8 = await loadLesson(DECK);
-  assert.equal(week8.slides.length, 30);
-  assert.equal(Object.keys(week8.questions).length, 19);
-  assert.equal(week8.questions.a.slide, 3);
+test('Sample deck and demo lesson load cleanly with stretch prompts and valid rooms', async () => {
+  const deck = await loadLesson(DECK);
+  assert.equal(deck.slides.length, 9);
+  assert.equal(Object.keys(deck.questions).length, 6);
+  assert.equal(deck.questions.a.slide, 3);
 
   const demo = await loadLesson(join(ROOT, 'example/demo-lesson.json'));
   assert.deepEqual([...new Set(demo.order.map((k) => demo.questions[k].kind))].sort(), ['bug', 'choice', 'code', 'grid', 'line', 'text']);
@@ -63,11 +63,11 @@ test('studentCopy strips speaker notes and work-slide answers, and serveSlides r
   assert.ok(workCues(html) > 0);
   assert.equal(workCues(out), 0);
 
-  const srv = await serveSlides(join(ROOT, 'example/lectures'), { port: 0, teacherPort: 0 });
+  const srv = await serveSlides(join(ROOT, 'example/slides'), { port: 0, teacherPort: 0 });
   try {
     const bad = await fetch(`http://127.0.0.1:${srv.port}/%E0%A4%A`);
     assert.equal(bad.status, 400, 'malformed percent-encoding returns 400 instead of crashing');
-    const ok = await fetch(`http://127.0.0.1:${srv.port}/week-08/week-08-slides.html`);
+    const ok = await fetch(`http://127.0.0.1:${srv.port}/sample-deck.html`);
     assert.equal(ok.status, 200);
   } finally {
     await srv.close();

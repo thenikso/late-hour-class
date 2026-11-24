@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Runs the Week 8 example: the slide server (student and teacher copies) and the game.
+// Runs the sample deck (example/slides): the slide server (student and teacher copies) and the game.
 //   npm run example            AI scoring with the local `claude` CLI
 //   npm run example -- --ai codex | mock | off
 //   npm run example -- --port 3000 --resume data/session-….json --data <folder> --term <file|off> --no-gate
@@ -28,9 +28,9 @@ const { values } = parseArgs({
 const port = Number(values.port);
 const slidesPort = Number(values['slides-port']);
 const teacherPort = slidesPort + 1;
-const deck = 'week-08/week-08-slides.html';
+const deck = 'sample-deck.html';
 
-const slides = await serveSlides(join(ROOT, 'example/lectures'), { port: slidesPort, teacherPort });
+const slides = await serveSlides(join(ROOT, 'example/slides'), { port: slidesPort, teacherPort });
 const s = await start({
   port,
   ai: values.ai,
