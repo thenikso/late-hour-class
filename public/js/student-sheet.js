@@ -39,7 +39,7 @@ export function createSheet({ send, room, layout, panels }) {
   let state = null;
   let drawn = ''; // what the sheet currently shows; redrawn only when this changes
   let editing = false; // changing an answer already handed in, or retrying
-  let shownResult = store.get('cge-shown') || ''; // the result card pops up once per attempt
+  let shownResult = store.get('lhc-shown') || ''; // the result card pops up once per attempt
   const drafts = {}; // question key -> what the student has typed or picked so far
 
   // The shared desk draft (written pair work): the latest text we know, and the editor showing it.
@@ -601,7 +601,7 @@ export function createSheet({ send, room, layout, panels }) {
     const id = `${q.key}:${mine.attempt}`;
     if (shownResult === id) return;
     shownResult = id;
-    store.set('cge-shown', id);
+    store.set('lhc-shown', id);
     openResult(false);
   }
 

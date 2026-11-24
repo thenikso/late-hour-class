@@ -160,7 +160,7 @@ export function screenFrame(iframe, card = null) {
       while ((s.cue || 0) > cueSeen) {
         cueSeen++;
         try {
-          iframe.contentWindow.postMessage({ type: 'cge:cue' }, '*');
+          iframe.contentWindow.postMessage({ type: 'lhc:cue' }, '*');
         } catch {}
       }
     },

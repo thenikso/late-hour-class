@@ -14,7 +14,7 @@ const PAIRS = { kind: 'text', pairs: true, title: 'Together', prompt: 'Write it 
 
 /** A game in the workshop with Ada + Bo at desk 0 and Cy + Di at desk 1, and the pair question open. */
 async function withDesks(fn) {
-  const dataDir = await mkdtemp(join(tmpdir(), 'cge-desks-'));
+  const dataDir = await mkdtemp(join(tmpdir(), 'lhc-desks-'));
   const game = new Game({ lesson: normaliseLesson({ questions: { w: PAIRS } }), dataDir, aiMode: 'mock', termFile: null, log: () => {} });
   const players = ['Ada', 'Bo', 'Cy', 'Di'].map((name, i) => {
     const p = game.join(name, i);

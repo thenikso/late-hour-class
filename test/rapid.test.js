@@ -25,7 +25,7 @@ const ROUND = {
 };
 
 async function withGame(def, fn) {
-  const dataDir = await mkdtemp(join(tmpdir(), 'cge-rapid-'));
+  const dataDir = await mkdtemp(join(tmpdir(), 'lhc-rapid-'));
   const game = new Game({ lesson: normaliseLesson({ questions: { r: def } }), dataDir, aiMode: 'mock', termFile: null, log: () => {} });
   const [ada, bo, cy] = ['Ada', 'Bo', 'Cy'].map((name, i) => {
     const p = game.join(name, i);

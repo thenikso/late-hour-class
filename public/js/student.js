@@ -22,7 +22,7 @@ const MODE_TEXT = {
 const WALK_SPEED = 5; // tiles per second
 const SEND_EVERY_MS = 80; // how often our position goes to the server while walking
 
-let token = store.get('cge-token');
+let token = store.get('lhc-token');
 let state = null; // the latest view from the server
 let me = { x: 16, y: 8, dir: 'down', moving: false }; // our avatar, moved here first and sent to the server
 let warp = -1; // the last server-side move of our avatar we have followed
@@ -45,7 +45,7 @@ function showJoin(message = '') {
   $('#join-err').textContent = message;
   const box = $('#avatars');
   box.innerHTML = '';
-  let pick = Number(store.get('cge-avatar') || Math.floor(Math.random() * AVATARS.length));
+  let pick = Number(store.get('lhc-avatar') || Math.floor(Math.random() * AVATARS.length));
   AVATARS.forEach((a, i) => {
     const b = h('button', { type: 'button', 'aria-pressed': String(i === pick), title: a.name }, avatarCanvas(i, 4));
     b.onclick = () => {
@@ -54,16 +54,16 @@ function showJoin(message = '') {
     };
     box.append(b);
   });
-  $('#name').value = store.get('cge-name') || '';
+  $('#name').value = store.get('lhc-name') || '';
   $('#join-form').onsubmit = async (e) => {
     e.preventDefault();
     try {
       const name = $('#name').value.trim();
       const r = await post('/api/join', { name, avatar: pick });
       token = r.token;
-      store.set('cge-token', token);
-      store.set('cge-name', name);
-      store.set('cge-avatar', String(pick));
+      store.set('lhc-token', token);
+      store.set('lhc-name', name);
+      store.set('lhc-avatar', String(pick));
       $('#join').hidden = true;
       start();
     } catch (err) {
@@ -99,7 +99,7 @@ function start() {
       onDesk: (d) => sheet.deskText(d),
       onFx,
       onGone(why) {
-        store.del('cge-token');
+        store.del('lhc-token');
         token = null;
         showJoin(why === 'kicked' ? 'You were removed from the room. Join again.' : 'Please join again.');
       },

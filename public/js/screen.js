@@ -71,7 +71,7 @@ const DECK_COMMANDS = {
 };
 addEventListener('message', (e) => {
   const message = e.data;
-  if (e.source !== $('#screen').contentWindow || message?.type !== 'cge:command' || !state?.screen.slide) return;
+  if (e.source !== $('#screen').contentWindow || message?.type !== 'lhc:command' || !state?.screen.slide) return;
   const body = DECK_COMMANDS[message.action]?.(message);
   if (body) {
     post(`/api/teacher/${message.action}?key=${encodeURIComponent(key)}`, body).catch((err) => {

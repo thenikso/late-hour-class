@@ -74,7 +74,7 @@ On the student page E uses what is within reach (`withinReach()` in `student.js`
 
 When the server moves a player (a seat, the hot seat, another room) it calls `Game.place`, which raises that player's `warp` number. The browser follows when it sees a new number and echoes it with every move; a move carrying an old number is ignored.
 
-The shared screen is an iframe that always renders at 1280×720 and is scaled with a CSS transform (`placeFrame()` in `common.js`). Don't resize the iframe itself: the decks are scroll-snap documents and reflowing them lands on the wrong slide. Slides change by setting the iframe URL to `deck#n`; the E cue is a `postMessage({type:'cge:cue'})` that `game-bridge.js` turns into an `e` keypress. The bridge also makes in-game slide jumps instant.
+The shared screen is an iframe that always renders at 1280×720 and is scaled with a CSS transform (`placeFrame()` in `common.js`). Don't resize the iframe itself: the decks are scroll-snap documents and reflowing them lands on the wrong slide. Slides change by setting the iframe URL to `deck#n`; the E cue is a `postMessage({type:'lhc:cue'})` that `game-bridge.js` turns into an `e` keypress. The bridge also makes in-game slide jumps instant.
 
 ## The fun layer
 

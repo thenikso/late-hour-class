@@ -36,7 +36,7 @@ async function withClassroom(opts, fn) {
     fn = opts;
     opts = {};
   }
-  const dataDir = await mkdtemp(join(tmpdir(), 'cge-'));
+  const dataDir = await mkdtemp(join(tmpdir(), 'lhc-'));
   const srv = await start({
     lesson: DECK,
     deck: 'http://127.0.0.1:1/sample-deck.html',
