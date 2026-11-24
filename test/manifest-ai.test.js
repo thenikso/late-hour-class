@@ -59,6 +59,8 @@ test('studentCopy strips speaker notes and work-slide answers, and serveSlides r
   const out = studentCopy(html);
   assert.ok(html.includes('class="sn"'));
   assert.ok(!out.includes('class="sn"'));
+  const slideCount = (s) => (s.match(/<section\b[^>]*class="slide"/g) || []).length;
+  assert.equal(slideCount(out), slideCount(html), 'every slide survives in the student copy');
   const workCues = (s) => [...s.matchAll(/<section[^>]*data-mode="work"[\s\S]*?<\/section>/g)].filter((m) => m[0].includes('data-cue')).length;
   assert.ok(workCues(html) > 0);
   assert.equal(workCues(out), 0);

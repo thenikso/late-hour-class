@@ -66,6 +66,7 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for the student-facing tour.
 - `public/js/editors.js`: the two CodeMirror editors: `proseEditor` and `codeEditor`.
 - `public/js/student.js`, `student-sheet.js`, `student-panels.js`, `teacher.js`, `teacher-question.js`, `screen.js`: the three pages. `common.js` has the DOM helper, SSE connection, screen iframe and score count-up.
 - `tools/serve-slides.js`: serves a lectures folder twice. The student copy strips speaker notes (`.sn`) and the answer boxes (`data-cue`) on `data-mode="work"` slides; the teacher copy is the full deck, on localhost only.
+- `docs/screenshots/`: the README pictures (projector, student, teacher), taken from the sample deck with made-up students. Retake them when the look changes a lot.
 - `example/slides/`: a short sample deck (`sample-deck.html`, the tests use it too), its tiny slide engine (`deck.js`, `deck.css`) and `game-bridge.js`, the script any deck loads to work inside the game.
 
 A player's position is the top-left of the tile they fill; their feet (`FEET`, and the small `FOOT_BOX` that collides) are near its bottom. The browser walks with `walk()` (it slides along furniture); the server only checks `canStand()` for each reported position and ignores a move into something solid. Every room must keep the door, the hot seat, the front strip and every seat free: a test checks it.

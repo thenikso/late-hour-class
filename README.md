@@ -6,6 +6,19 @@ The design and its reasons are in [docs/design.md](docs/design.md); a 1-page tou
 
 A pixel-art classroom that runs from the teacher's laptop. Students join from their own browser over the classroom Wi-Fi, pick an avatar and walk around a shared room. The teacher drives the slides on the room's screen, seats everyone for explanations, opens questions, and reveals scores with a bit of show.
 
+![The projector: twelve students stand in the floor zone of the answer they picked, under the slide on the wall screen](docs/screenshots/projector.png)
+
+<table>
+<tr>
+<td width="50%"><img src="docs/screenshots/student.png" alt="A student's laptop: the room on the left, the open question and their handed-in answer on the right"></td>
+<td width="50%"><img src="docs/screenshots/teacher.png" alt="The teacher view: the slide list, the open question with live answers and scores, and who is online"></td>
+</tr>
+<tr>
+<td align="center">A student's laptop</td>
+<td align="center">The teacher's view</td>
+</tr>
+</table>
+
 One Node process, nothing to install, no build step. Node 20 or later. The only outside code is CodeMirror, the editor students type in, which ships ready-made in `public/vendor/`.
 
 ## Run the sample deck
